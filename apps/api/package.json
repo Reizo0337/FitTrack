@@ -9,6 +9,9 @@
     "dev:db": "tsx scripts/dev-db.ts",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
+    "neon:migrate": "node --env-file=../../.env.local ../../node_modules/prisma/build/index.js migrate deploy",
+    "neon:start": "node --env-file=../../.env.local --import tsx src/server.ts",
+    "neon:create-user": "node --env-file=../../.env.local --import tsx scripts/create-user.ts",
     "create-user": "tsx scripts/create-user.ts",
     "test": "vitest run",
     "typecheck": "tsc -p ."

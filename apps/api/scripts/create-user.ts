@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { createPrisma } from '../src/db';
 import { loadEnv } from '../src/env';
 import { createUser } from '../src/users';
 
@@ -8,8 +8,8 @@ if (!email || !password) {
   console.error('Uso: npm run create-user -- <email> <contraseña (>=12 caracteres)>');
   process.exit(1);
 }
-loadEnv();
-const prisma = new PrismaClient();
+const env = loadEnv();
+const prisma = createPrisma(env.DATABASE_URL);
 try {
   const u = await createUser(prisma, { email, password });
   console.log(`Usuario creado: ${u.email}`);

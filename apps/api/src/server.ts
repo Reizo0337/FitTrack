@@ -1,9 +1,9 @@
-import { PrismaClient } from '@prisma/client';
 import { buildApp } from './app';
+import { createPrisma } from './db';
 import { loadEnv } from './env';
 
 const env = loadEnv();
-const prisma = new PrismaClient();
+const prisma = createPrisma(env.DATABASE_URL);
 const app = await buildApp(env, prisma);
 
 const close = async () => {

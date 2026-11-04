@@ -4,7 +4,9 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url       = env("DATABASE_URL")
+  // Neon: DATABASE_URL es la URL con pool (tráfico de la app); las migraciones usan la directa (sin pool).
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 // Convenciones: instantes en timestamptz (UTC); `localDate` = día calendario del usuario

@@ -5,3 +5,5 @@ dist
 *.log
 apps/web/ios
 apps/api/uploads
+.neon
+.env.local

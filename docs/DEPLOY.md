@@ -10,10 +10,18 @@ Para probar el modo «un solo servicio»: `npm run build -w @fittrack/web` y arr
 Un único servicio **Render** (Docker) sirve la API y la web compilada desde el mismo origen + **Neon** (PostgreSQL). Mismo origen es imprescindible: Safari/iOS bloquea las cookies de terceros, así que web y API en dominios distintos no mantendrían la sesión.
 
 ### 2.1 Base de datos (Neon)
-1. Crea un proyecto en Neon (Postgres 16/17, codificación UTF-8 por defecto). Copia la cadena de conexión *pooled/direct* con `?sslmode=require`.
-2. **No** uses el Postgres gratuito de Render (se elimina a los 30 días).
-3. Neon escala a cero tras inactividad: la primera consulta puede tardar 1-2 s.
+El proyecto ya está enlazado con `neon init` (fichero `neon.ts`, rama `production`). Neon da **dos** cadenas de conexión por rama, y la app usa ambas:
 
+| Variable | Para qué | Host |
+|---|---|---|
+| `DATABASE_URL` | tráfico normal de la API | con `-pooler` (PgBouncer). `src/db.ts` añade `pgbouncer=true` solo |
+| `DATABASE_URL_UNPOOLED` | migraciones (`directUrl` de Prisma) | directo |
+
+- `neon env pull` las escribe en `.env.local` (ignorado por git). **No uses el Postgres gratuito de Render** (caduca a los 30 días).
+- Prueba en una rama antes de producción: `neon checkout dev --create` (caduca a los 7 días), `npm run neon:migrate`, `npm run neon:create-user -- email "contraseña"`, `npm run neon:start`. Vuelve con `neon checkout production`.
+- Los scripts `neon:*` leen `.env.local` pero conservan `MASTER_KEY` y `JWT_SECRET` de `apps/api/.env`, así que tu base local no se mezcla.
+- En Render pon **las dos** variables (copia los valores de `.env.local` de la rama `production`). Al arrancar, el `Dockerfile` ejecuta `prisma migrate deploy` con la directa.
+- Neon escala a cero tras inactividad: la primera consulta puede tardar 1-2 s.
 ### 2.2 Servicio web (Render)
 1. Sube el repositorio a GitHub (privado) y crea un *Blueprint* en Render apuntando a `render.yaml`.
 2. Variables (Render las pide al crear el blueprint):

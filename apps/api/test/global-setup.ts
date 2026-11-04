@@ -9,7 +9,7 @@ export default function setup() {
   const schema = `test_${randomBytes(4).toString('hex')}`;
   const url = `${base.split('?')[0]}?schema=${schema}`;
   process.env.TEST_DATABASE_URL = url;
-  execSync('npx prisma migrate deploy', { stdio: 'pipe', env: { ...process.env, DATABASE_URL: url } });
+  execSync('npx prisma migrate deploy', { stdio: 'pipe', env: { ...process.env, DATABASE_URL: url, DATABASE_URL_UNPOOLED: url } });
   return () => {
     // el schema temporal se elimina vía prisma en teardown manual si se desea; es inocuo
   };

@@ -6,7 +6,9 @@ services:
     plan: free
     healthCheckPath: /api/health
     envVars:
-      - key: DATABASE_URL        # cadena de conexión de Neon (con ?sslmode=require)
+      - key: DATABASE_URL        # Neon: URL CON pool (host con -pooler); 'neon env pull' la escribe como DATABASE_URL
+        sync: false
+      - key: DATABASE_URL_UNPOOLED   # Neon: URL directa (sin pool), solo para migraciones al arrancar
         sync: false
       - key: MASTER_KEY          # 64 caracteres hex: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
         sync: false
