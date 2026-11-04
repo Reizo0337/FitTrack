@@ -26,7 +26,8 @@ export const foodRoutes: FastifyPluginAsync = async (app) => {
     const { q } = z.object({ q: z.string().min(2).max(80) }).parse(req.query);
     try {
       return { items: await offSearch(app.fetchImpl, q) };
-    } catch {
+    } catch (e) {
+      req.log.warn({ off: String(e) }, 'Open Food Facts: búsqueda no disponible'); // el motivo queda en los logs del servidor
       return reply.code(502).send({ error: 'OFF_UNAVAILABLE' });
     }
   });
@@ -39,7 +40,8 @@ export const foodRoutes: FastifyPluginAsync = async (app) => {
     try {
       const r = await offByBarcode(app.fetchImpl, code);
       return { ...r, origin: 'off', barcode: code };
-    } catch {
+    } catch (e) {
+      req.log.warn({ off: String(e) }, 'Open Food Facts: código de barras no disponible');
       return reply.code(502).send({ error: 'OFF_UNAVAILABLE' });
     }
   });
