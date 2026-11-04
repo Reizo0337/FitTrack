@@ -1,118 +1,107 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Scale, ScanBarcode, Sparkles, Utensils } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import { Bar, Chart, Ring } from '../components/Chart';
-import { todayStr, useApp } from '../ctx';
-import type { Diary } from './Food';
+import { ActivitySummary } from '../components/ActivitySummary';
+import { CalorieSummary, MealCard } from '../components/nutrition';
+import { greeting, PageHeader } from '../components/PageHeader';
+import { shiftDate, todayStr, useApp } from '../ctx';
+import { useData } from '../hooks';
+import type { Dash, Profile } from '../types';
+import { useToast } from '../ui/overlays';
+import { Button, Card, ErrorState, LoadingState, Notice, SectionHeader, cx } from '../ui/primitives';
+import { ProgressBar, Stat } from '../ui/progress';
 
-type Dash = {
-  date: string; diary: Diary;
-  weight: { currentKg: number | null; startKg: number; goalKg: number; lostKg: number | null; remainingKg: number | null; progressPct: number | null; avg7Kg: number | null; weeklyChangeKg: number | null; note: string };
-  activity: { steps: number | null; activeKcal: number | null; restingKcal: number | null; distanceKm: number | null; exerciseMin: number | null; source: string } | null;
-  sleep: { totalMin: number | null; source: string } | null;
-  history: { date: string; kcal: number; protein: number; carbs: number; fat: number }[];
-};
-type Derived = { bmr: number; tdee: number; expectedWeeklyLossKg: number; weeksToGoal: number | null; pace: { message: string }; warnings: string[] };
-
-const Stat = ({ label, value, sub }: { label: string; value: string; sub?: string }) => (
-  <div className="rounded-xl bg-slate-100 p-3 dark:bg-[#1b2430]"><p className="text-xs text-slate-500">{label}</p><p className="text-lg font-bold">{value}</p>{sub && <p className="text-xs text-slate-500">{sub}</p>}</div>
-);
+const sign = (v: number) => `${v > 0 ? '+' : ''}${v.toLocaleString('es')}`;
 
 export function Home() {
-  const { version, bump, openAdd } = useApp();
-  const [d, setD] = useState<Dash | null>(null);
-  const [der, setDer] = useState<Derived | null>(null);
-  const [err, setErr] = useState(false);
-  const date = todayStr();
-  const load = useCallback(async () => {
-    const [a, b] = await Promise.all([api<Dash>(`/dashboard?date=${date}`), api<{ derived: Derived }>('/profile')]);
-    setD(a); setDer(b.derived);
-  }, [date]);
-  useEffect(() => { load().catch(() => setErr(true)); }, [load, version]);
+  const { openAdd, openWeight, bump } = useApp();
+  const nav = useNavigate();
+  const toast = useToast();
+  const today = todayStr();
+  const dash = useData<Dash>(`/dashboard?date=${today}`);
+  const prof = useData<{ profile: Profile }>('/profile');
 
-  async function water(ml: number) { await api('/diary/water', { method: 'POST', body: JSON.stringify({ date, ml }) }); bump(); }
-  async function undoWater() { await api(`/diary/water/last?date=${date}`, { method: 'DELETE' }).catch(() => undefined); bump(); }
+  if (dash.loading) return <><PageHeader title="Inicio" /><LoadingState /></>;
+  if (dash.error || !dash.data) return <><PageHeader title="Inicio" /><ErrorState onRetry={dash.reload} /></>;
+  const { diary: d, weight: w } = dash.data;
+  const name = prof.data?.profile.displayName?.trim();
+  const date = new Date().toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
 
-  if (err) return <p role="alert" className="text-red-500">No se pudo cargar el panel.</p>;
-  if (!d) return <p className="text-slate-500">Cargando…</p>;
-  const { diary: y, weight: w } = d;
-  const left = Math.round(y.remaining.kcal ?? 0);
-  const proteinLeft = Math.max(0, Math.round(y.remaining.protein ?? 0));
-  const hist = d.history;
+  async function repeat(type: string) {
+    const r = await api<{ copied: number }>('/diary/copy', { method: 'POST', body: JSON.stringify({ fromDate: shiftDate(today, -1), toDate: today, type }) });
+    toast(r.copied ? 'Comida repetida de ayer' : 'Ayer no registraste esta comida', r.copied ? 'success' : 'info');
+    bump();
+  }
+
+  const quick = [
+    { icon: Utensils, label: 'Comida', run: () => openAdd({}) },
+    { icon: ScanBarcode, label: 'Escanear', run: () => openAdd({ tab: 'scan' }) },
+    { icon: Scale, label: 'Peso', run: openWeight },
+    { icon: Sparkles, label: 'IA', run: () => nav('/ai') },
+  ];
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">Hoy</h1>
+    <>
+      <PageHeader title={`${greeting()}${name ? `, ${name}` : ''}`} overline={date} />
 
-      <section className="card flex items-center gap-4">
-        <Ring pct={w.progressPct != null ? w.progressPct / 100 : 0} size={110} color="#22c55e">
-          <b className="text-xl">{w.progressPct != null ? `${w.progressPct}%` : '—'}</b><span className="text-[10px] text-slate-500">hacia {w.goalKg} kg</span>
-        </Ring>
-        <div className="grid flex-1 grid-cols-2 gap-2">
-          <Stat label="Peso actual" value={w.currentKg != null ? `${w.currentKg} kg` : 'Sin registro'} sub={w.avg7Kg != null ? `media 7 d: ${w.avg7Kg}` : undefined} />
-          <Stat label="Objetivo" value={`${w.goalKg} kg`} sub={w.remainingKg != null ? `faltan ${w.remainingKg} kg` : undefined} />
-          <Stat label="Perdidos" value={w.lostKg != null ? `${w.lostKg} kg` : '—'} sub={w.weeklyChangeKg != null ? `${w.weeklyChangeKg > 0 ? '+' : ''}${w.weeklyChangeKg} kg vs sem. ant.` : undefined} />
-        </div>
-      </section>
-      {w.currentKg == null && <p className="text-sm text-slate-500">Registra tu primer peso en <b>Progreso</b> para ver tu avance.</p>}
-
-      <section className="card">
-        <div className="flex items-center gap-4">
-          <Ring pct={y.totals.kcal / y.targets.kcal} size={110} color={left < 0 ? '#f59e0b' : '#22c55e'}>
-            <b className="text-xl">{Math.abs(left)}</b><span className="text-[10px] text-slate-500">{left >= 0 ? 'kcal restantes' : 'kcal de más'}</span>
-          </Ring>
-          <div className="grid flex-1 gap-2"><Bar label="Proteínas" value={y.totals.protein} target={y.targets.protein} color="#60a5fa" /><Bar label="Carbohidratos" value={y.totals.carbs} target={y.targets.carbs} color="#fbbf24" /><Bar label="Grasas" value={y.totals.fat} target={y.targets.fat} color="#f472b6" /><Bar label="Fibra" value={y.totals.fiber} target={y.targets.fiber} color="#a78bfa" /></div>
-        </div>
-        <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-          {y.totals.kcal === 0 ? 'Aún no has registrado comidas hoy.' : `Consumidas ${Math.round(y.totals.kcal)} de ${y.targets.kcal} kcal. ${proteinLeft > 0 ? `Te faltan ${proteinLeft} g de proteína.` : 'Proteína del día cubierta.'}`}
-        </p>
-        <button className="btn mt-3 w-full" onClick={() => openAdd({})}>+ Registrar comida</button>
-      </section>
-
-      {y.productAlerts.filter((a) => a.level === 'warn').map((a) => <p key={a.productId} role="alert" className="rounded-xl bg-amber-500/10 p-3 text-sm">{a.messages[0]}</p>)}
-
-      <section className="card">
-        <h2 className="mb-2 font-semibold">Agua</h2>
-        <Bar label="Hoy" value={y.waterMl} target={y.targets.waterMl} color="#38bdf8" unit="ml" />
-        <div className="mt-3 flex gap-2 text-sm">
-          {[250, 500].map((ml) => <button key={ml} className="flex-1 rounded-xl border border-slate-300 py-2 dark:border-slate-700" onClick={() => water(ml)}>+{ml} ml</button>)}
-          <button className="rounded-xl px-3 text-slate-500" onClick={undoWater} aria-label="Deshacer último vaso">↶</button>
-        </div>
-      </section>
-
-      <section className="card">
-        <h2 className="mb-2 font-semibold">Actividad y sueño</h2>
-        {d.activity || d.sleep ? (
-          <div className="grid grid-cols-2 gap-2">
-            <Stat label="Pasos" value={d.activity?.steps?.toLocaleString('es') ?? '—'} />
-            <Stat label="Calorías activas" value={d.activity?.activeKcal != null ? `${Math.round(d.activity.activeKcal)} kcal` : '—'} />
-            <Stat label="Ejercicio" value={d.activity?.exerciseMin != null ? `${Math.round(d.activity.exerciseMin)} min` : '—'} />
-            <Stat label="Sueño" value={d.sleep?.totalMin != null ? `${Math.floor(d.sleep.totalMin / 60)} h ${d.sleep.totalMin % 60} min` : '—'} />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start">
+        <div className="flex flex-col gap-4">
+          <CalorieSummary d={d} />
+          {d.productAlerts.filter((a) => a.level === 'warn').map((a) => <Notice key={a.productId} tone="warn">{a.messages[0]}</Notice>)}
+          <div>
+            <SectionHeader title="Comidas de hoy" action={<Link to="/food" className="text-sm font-medium text-accent-strong">Ver diario</Link>} />
+            <div className="flex flex-col gap-2.5">
+              {d.meals.filter((m) => m.type !== 'SNACKS' || m.entries.length).map((m) => (
+                <MealCard key={m.type} meal={m} onAdd={() => openAdd({ type: m.type })} onRepeat={() => repeat(m.type)} />
+              ))}
+            </div>
           </div>
-        ) : <p className="text-sm text-slate-500">Sin datos de actividad ni sueño: aún no están conectados (Apple Health y registro manual llegan en la siguiente fase). No se muestran valores inventados.</p>}
-      </section>
+        </div>
 
-      <section className="card">
-        <h2 className="mb-2 font-semibold">Calorías (14 días)</h2>
-        <Chart bars unit=" kcal" goal={{ y: y.targets.kcal, label: 'objetivo' }} series={[{ name: 'Consumidas', color: '#22c55e', pts: hist.map((h) => ({ x: h.date, y: Math.round(h.kcal) })) }]} />
-      </section>
-      <section className="card">
-        <h2 className="mb-2 font-semibold">Macronutrientes (14 días)</h2>
-        <Chart unit=" g" series={[
-          { name: 'Proteínas', color: '#60a5fa', pts: hist.map((h) => ({ x: h.date, y: Math.round(h.protein) })) },
-          { name: 'Carbohidratos', color: '#fbbf24', pts: hist.map((h) => ({ x: h.date, y: Math.round(h.carbs) })) },
-          { name: 'Grasas', color: '#f472b6', pts: hist.map((h) => ({ x: h.date, y: Math.round(h.fat) })) },
-        ]} />
-      </section>
+        <div className="flex flex-col gap-4">
+          <ul className="grid grid-cols-4 gap-2" aria-label="Acciones rápidas">
+            {quick.map(({ icon: I, label, run }) => (
+              <li key={label}>
+                <button onClick={run} className="flex min-h-[4.5rem] w-full flex-col items-center justify-center gap-1.5 rounded-card border border-line bg-surface text-[0.8125rem] font-medium transition hover:bg-surface-2 active:scale-[.97]">
+                  <I className="size-5 text-accent-strong" aria-hidden />{label}
+                </button>
+              </li>
+            ))}
+          </ul>
 
-      {der && (
-        <section className="card text-sm">
-          <h2 className="mb-2 font-semibold">Plan <span className="text-xs font-normal text-amber-500">(estimaciones por fórmula, no valores médicos)</span></h2>
-          <p>Basal ≈ {der.bmr} kcal · gasto estimado ≈ {der.tdee} kcal · pérdida esperada ≈ {der.expectedWeeklyLossKg} kg/sem{der.weeksToGoal != null ? ` · ≈ ${(der.weeksToGoal / 4.345).toFixed(1)} meses hasta ${w.goalKg} kg` : ''}.</p>
-          <p className="mt-1 text-slate-500">{der.pace.message}</p>
-          {der.warnings.map((x) => <p key={x} className="mt-1 text-amber-500">⚠ {x}</p>)}
-        </section>
-      )}
-      <p className="text-xs text-slate-500">{w.note}</p>
-    </div>
+          <div>
+            <SectionHeader title="Actividad" action={<Link to="/activity" className="text-sm font-medium text-accent-strong">Ver más</Link>} />
+            <ActivitySummary activity={dash.data.activity} sleep={dash.data.sleep} />
+          </div>
+
+          <div>
+            <SectionHeader title="Progreso" action={<Link to="/progress" className="text-sm font-medium text-accent-strong">Ver evolución</Link>} />
+            <Card>
+              {w.currentKg == null ? (
+                <div className="flex flex-col items-start gap-3">
+                  <p className="t-body">Aún no has registrado tu peso. Cuando lo hagas verás aquí tu avance hacia {w.goalKg} kg.</p>
+                  <Button onClick={openWeight}>Registrar peso</Button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-end justify-between gap-3">
+                    <div><p className="t-meta">Peso actual</p><p className="num t-display">{w.currentKg.toLocaleString('es')}<span className="t-meta font-normal"> kg</span></p></div>
+                    {w.lostKg != null && <p className={cx('num pb-1 text-sm font-semibold', w.lostKg > 0 ? 'text-accent-strong' : 'text-ink-2')}>{sign(-w.lostKg)} kg</p>}
+                  </div>
+                  <div className="mt-4"><ProgressBar value={(w.progressPct ?? 0) / 100} height={8} label="Progreso hacia el objetivo" /></div>
+                  <div className="mt-2 flex justify-between"><span className="t-meta">{w.startKg} kg</span><span className="t-meta">{w.progressPct}% · objetivo {w.goalKg} kg</span></div>
+                  <div className="mt-4 grid grid-cols-3 gap-3 border-t border-line pt-4">
+                    <Stat label="Faltan" value={`${w.remainingKg} kg`} />
+                    <Stat label="Media 7 d" value={w.avg7Kg != null ? `${w.avg7Kg} kg` : '—'} />
+                    <Stat label="Semana" value={w.weeklyChangeKg != null ? `${sign(w.weeklyChangeKg)} kg` : '—'} />
+                  </div>
+                </>
+              )}
+            </Card>
+            <p className="t-meta mt-2 px-1">{w.note}</p>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

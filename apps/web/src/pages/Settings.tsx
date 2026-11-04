@@ -1,77 +1,170 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { api, ApiError } from '../api';
+import { PageHeader } from '../components/PageHeader';
+import { useData } from '../hooks';
+import type { Profile } from '../types';
+import { Sheet, useToast } from '../ui/overlays';
+import { Button, Card, FormField, LoadingState, Notice, Segmented, SelectField, cx } from '../ui/primitives';
+import { getThemePref, setThemePref, type ThemePref } from '../ui/theme';
 
-type Profile = { goalWeightKg: number; activityLevel: string; timezone: string; targetKcal: number; targetProteinG: number; targetFatG: number; targetFiberG: number; targetWaterMl: number; allergies: string[]; dislikedFoods: string[]; aiConsent: boolean };
-type Reminder = { kind: string; enabled: boolean; timeLocal: string; weekdays: number[] };
-type Tok = { id: string; label: string; createdAt: string; lastUsedAt: string | null };
-type PushCfg = { enabled: boolean; publicKey: string | null; cronConfigured: boolean };
-
+const ACT: [string, string][] = [['SEDENTARY', 'Sedentaria'], ['LIGHT', 'Ligera'], ['MODERATE', 'Moderada'], ['ACTIVE', 'Alta'], ['VERY_ACTIVE', 'Muy alta']];
+const DAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const KIND_LABEL: Record<string, string> = {
   WAKE: 'Registrar la hora de despertar', WATER: 'Beber agua', BREAKFAST: 'Registrar el desayuno', LUNCH: 'Registrar la comida', DINNER: 'Registrar la cena',
-  WALK: 'Caminar (si llevas pocos pasos)', LOG_DINNER: 'Completar el seguimiento del día', BEDTIME: 'Hora de acostarme', WEIGH_IN: 'Pesarme',
+  WALK: 'Caminar (si llevas pocos pasos)', LOG_DINNER: 'Completar el seguimiento del día', BEDTIME: 'Hora de acostarme', WEIGH_IN: 'Pesarme', WEEKLY_REPORT: 'Informe semanal',
 };
-const DAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
-const ACT: [string, string][] = [['SEDENTARY', 'Sedentaria'], ['LIGHT', 'Ligera'], ['MODERATE', 'Moderada'], ['ACTIVE', 'Alta'], ['VERY_ACTIVE', 'Muy alta']];
+const b64ToU8 = (s: string) => Uint8Array.from(atob((s + '='.repeat((4 - (s.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
 
-const b64ToU8 = (s: string) => {
-  const raw = atob((s + '='.repeat((4 - (s.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
-  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
-};
-
-export function Settings() {
-  const [msg, setMsg] = useState('');
+function Section({ id, title, text, children }: { id: string; title: string; text?: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">Ajustes</h1>
-      {msg && <p role="status" className="rounded-xl bg-slate-200 p-3 text-sm dark:bg-slate-800">{msg}</p>}
-      <Goals say={setMsg} />
-      <Health say={setMsg} />
-      <Notifications say={setMsg} />
-    </div>
+    <section id={id} className="scroll-mt-6">
+      <h2 className="t-head px-1">{title}</h2>
+      {text && <p className="t-meta mb-2 mt-0.5 px-1">{text}</p>}
+      <Card className="mt-2">{children}</Card>
+    </section>
   );
 }
 
-function Goals({ say }: { say: (m: string) => void }) {
-  const [p, setP] = useState<Profile | null>(null);
+export function Settings({ onLogout }: { onLogout: () => void }) {
+  const [theme, setTheme] = useState<ThemePref>(getThemePref());
+  useEffect(() => { if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView(); }, []);
+  return (
+    <>
+      <PageHeader title="Ajustes" bare />
+      <div className="flex flex-col gap-7 lg:max-w-2xl">
+        <Goals />
+        <Section id="ia" title="Asistente de IA" text="Elige el proveedor y el modelo de cada tarea. Las claves se guardan cifradas en el servidor.">
+          <AISettings />
+        </Section>
+        <Section id="apple-health" title="Apple Health" text="Una web no puede leer HealthKit: un Atajo de iOS envía tus datos con un token personal."><Health /></Section>
+        <Section id="notificaciones" title="Notificaciones"><Notifications /></Section>
+        <Section id="apariencia" title="Apariencia">
+          <Segmented<ThemePref> label="Tema" value={theme} onChange={(v) => { setTheme(v); setThemePref(v); }} options={[{ value: 'system', label: 'Sistema' }, { value: 'light', label: 'Claro' }, { value: 'dark', label: 'Oscuro' }]} />
+        </Section>
+        <Section id="privacidad" title="Privacidad y cuenta">
+          <ul className="flex flex-col gap-3 text-sm">
+            <li className="flex items-start justify-between gap-4"><span>Exportar mis datos<span className="t-meta block">Aún no disponible.</span></span></li>
+            <li className="flex items-start justify-between gap-4"><span>Eliminar todos mis datos<span className="t-meta block">Aún no disponible.</span></span></li>
+            <li className="border-t border-line pt-3"><Button variant="secondary" onClick={onLogout}>Cerrar sesión</Button></li>
+          </ul>
+        </Section>
+      </div>
+    </>
+  );
+}
+
+function Goals() {
+  const toast = useToast();
+  const { data, loading } = useData<{ profile: Profile }>('/profile');
   const [warn, setWarn] = useState<string[]>([]);
-  useEffect(() => { api<{ profile: Profile }>('/profile').then((r) => setP(r.profile)); }, []);
-  if (!p) return null;
+  const [busy, setBusy] = useState(false);
+  if (loading || !data) return <LoadingState rows={1} />;
+  const p = data.profile;
+
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
     const n = (k: string) => Number(String(f.get(k)).replace(',', '.'));
     const list = (k: string) => String(f.get(k) || '').split(',').map((s) => s.trim()).filter(Boolean);
+    setBusy(true);
     try {
       const r = await api<{ derived: { warnings: string[]; pace: { message: string } } }>('/profile', { method: 'PUT', body: JSON.stringify({
-        targetKcal: n('kcal'), targetProteinG: n('protein'), targetFatG: n('fat'), targetFiberG: n('fiber'), targetWaterMl: n('water'), goalWeightKg: n('goal'),
-        activityLevel: String(f.get('activity')), allergies: list('allergies'), dislikedFoods: list('disliked'), aiConsent: f.get('ai') === 'on',
+        displayName: String(f.get('name') || ''), targetKcal: n('kcal'), targetProteinG: n('protein'), targetFatG: n('fat'), targetFiberG: n('fiber'), targetWaterMl: n('water'),
+        goalWeightKg: n('goal'), activityLevel: String(f.get('activity')), allergies: list('allergies'), dislikedFoods: list('disliked'), aiConsent: f.get('ai') === 'on',
       }) });
-      setWarn(r.derived.warnings); say(`Objetivos guardados. ${r.derived.pace.message}`);
-    } catch (er) { say(er instanceof ApiError && er.status === 400 ? 'Algún valor está fuera de rango.' : 'No se pudo guardar.'); }
+      setWarn(r.derived.warnings); toast('Cambios guardados');
+    } catch (er) { toast(er instanceof ApiError && er.status === 400 ? 'Algún valor está fuera de rango' : 'No se pudo guardar', 'error'); }
+    finally { setBusy(false); }
   }
-  const row = (k: string, label: string, v: number | string, ph = '') => <label className="text-xs text-slate-500">{label}<input name={k} className="input mt-1" inputMode="decimal" defaultValue={v} placeholder={ph} required /></label>;
+
   return (
-    <form onSubmit={save} className="card flex flex-col gap-2">
-      <h2 className="font-semibold">Objetivos</h2>
-      <p className="text-xs text-slate-500">Son estimaciones iniciales, no valores médicos. Ajústalos según tu evolución o las indicaciones de un profesional.</p>
-      <div className="grid grid-cols-2 gap-2">
-        {row('kcal', 'Calorías (kcal)', p.targetKcal)}{row('protein', 'Proteínas (g)', p.targetProteinG)}{row('fat', 'Grasas (g)', p.targetFatG)}
-        {row('fiber', 'Fibra (g)', p.targetFiberG)}{row('water', 'Agua (ml)', p.targetWaterMl)}{row('goal', 'Peso objetivo (kg)', p.goalWeightKg)}
-        <label className="col-span-2 text-xs text-slate-500">Actividad<select name="activity" className="input mt-1" defaultValue={p.activityLevel}>{ACT.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-        <label className="col-span-2 text-xs text-slate-500">Alergias / intolerancias (separadas por comas)<input name="allergies" className="input mt-1" defaultValue={p.allergies.join(', ')} /></label>
-        <label className="col-span-2 text-xs text-slate-500">Alimentos que no quieres que se recomienden<input name="disliked" className="input mt-1" defaultValue={p.dislikedFoods.join(', ')} /></label>
-        <label className="col-span-2 flex items-center gap-2 text-sm"><input type="checkbox" name="ai" defaultChecked={p.aiConsent} className="size-4" /> Permitir enviar mis datos agregados a un modelo de IA (Fase 5)</label>
-      </div>
-      {warn.map((w) => <p key={w} className="text-sm text-amber-500">⚠ {w}</p>)}
-      <button className="btn">Guardar objetivos</button>
-    </form>
+    <Section id="perfil" title="Perfil y objetivos" text="Son estimaciones iniciales, no valores médicos. Ajústalos según tu evolución o las indicaciones de un profesional.">
+      <form onSubmit={save} className="flex flex-col gap-3">
+        <FormField label="Nombre (para el saludo)" name="name" defaultValue={p.displayName} maxLength={80} />
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Calorías (kcal)" name="kcal" inputMode="decimal" defaultValue={p.targetKcal} required />
+          <FormField label="Proteínas (g)" name="protein" inputMode="decimal" defaultValue={p.targetProteinG} required />
+          <FormField label="Grasas (g)" name="fat" inputMode="decimal" defaultValue={p.targetFatG} required />
+          <FormField label="Fibra (g)" name="fiber" inputMode="decimal" defaultValue={p.targetFiberG} required />
+          <FormField label="Agua (ml)" name="water" inputMode="decimal" defaultValue={p.targetWaterMl} required />
+          <FormField label="Peso objetivo (kg)" name="goal" inputMode="decimal" defaultValue={p.goalWeightKg} required />
+        </div>
+        <SelectField label="Nivel de actividad" name="activity" defaultValue={p.activityLevel}>{ACT.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</SelectField>
+        <FormField label="Alergias e intolerancias" name="allergies" defaultValue={p.allergies.join(', ')} hint="Separadas por comas. La IA nunca las propondrá." />
+        <FormField label="Alimentos que prefieres evitar" name="disliked" defaultValue={p.dislikedFoods.join(', ')} />
+        <label className="flex min-h-11 items-start gap-3 text-sm"><input type="checkbox" name="ai" defaultChecked={p.aiConsent} className="mt-1 size-5 accent-[var(--accent)]" />
+          <span>Permitir que la IA consulte mis datos agregados (sin nombre ni email) para responder y recomendar.</span></label>
+        {warn.map((w) => <Notice key={w} tone="warn">{w}</Notice>)}
+        <Button type="submit" loading={busy} block>Guardar cambios</Button>
+      </form>
+    </Section>
   );
 }
 
-function Health({ say }: { say: (m: string) => void }) {
+type AICfg = { consent: boolean; providers: { provider: string; hasKey: boolean }[]; tasks: { task: string; provider: string; model: string }[]; defaults: Record<string, Record<string, string>>; usageToday: { calls: number; limit: number; tokensIn: number; tokensOut: number } };
+const PROV: Record<string, string> = { ANTHROPIC: 'Anthropic Claude', GEMINI: 'Google Gemini', OPENAI: 'OpenAI' };
+const TASK: Record<string, string> = { NUTRITIONIST: 'Nutricionista (chat y menús)', FOOD_RECOGNITION: 'Reconocimiento de comidas', WEEKLY_ANALYSIS: 'Análisis semanal' };
+
+function AISettings() {
+  const toast = useToast();
+  const { data, error, reload } = useData<AICfg>('/ai/config');
+  const [tasks, setTasks] = useState<AICfg['tasks']>([]);
+  const [keyFor, setKeyFor] = useState<string | null>(null);
+  useEffect(() => { if (data) setTasks(data.tasks); }, [data]);
+  if (error) return <p className="t-meta">El servidor no incluye todavía la función de IA.</p>;
+  if (!data) return <LoadingState rows={1} />;
+
+  async function saveKey(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const apiKey = String(new FormData(e.currentTarget).get('key'));
+    try { await api('/ai/keys', { method: 'PUT', body: JSON.stringify({ provider: keyFor, apiKey }) }); toast('Clave guardada'); setKeyFor(null); reload(); }
+    catch { toast('No se pudo guardar la clave', 'error'); }
+  }
+  async function removeKey(provider: string) { await api(`/ai/keys/${provider}`, { method: 'DELETE' }); toast('Clave eliminada'); reload(); }
+  async function saveTasks() {
+    try { await api('/ai/config', { method: 'PUT', body: JSON.stringify({ items: tasks }) }); toast('Modelos guardados'); }
+    catch (er) { toast(er instanceof ApiError && er.status === 400 ? 'Nombre de modelo no válido' : 'No se pudo guardar', 'error'); }
+  }
+  const upd = (task: string, patch: Partial<AICfg['tasks'][number]>) => setTasks((xs) => xs.map((x) => (x.task === task ? { ...x, ...patch } : x)));
+
+  return (
+    <div className="flex flex-col gap-5">
+      <ul className="flex flex-col">
+        {data.providers.map((p) => (
+          <li key={p.provider} className="flex min-h-14 items-center justify-between gap-3 border-t border-line first:border-0">
+            <span><span className="font-medium">{PROV[p.provider]}</span><span className={cx('t-meta block', p.hasKey && 'text-accent-strong')}>{p.hasKey ? 'Clave guardada' : 'Sin clave'}</span></span>
+            <span className="flex gap-2">{p.hasKey && <Button variant="ghost" size="sm" onClick={() => removeKey(p.provider)}>Quitar</Button>}<Button variant="secondary" size="sm" onClick={() => setKeyFor(p.provider)}>{p.hasKey ? 'Cambiar' : 'Añadir'}</Button></span>
+          </li>
+        ))}
+      </ul>
+      <div className="flex flex-col gap-3 border-t border-line pt-4">
+        {tasks.map((t) => (
+          <div key={t.task} className="grid grid-cols-[1fr_1fr] gap-2">
+            <p className="col-span-2 text-sm font-medium">{TASK[t.task]}</p>
+            <SelectField label="Proveedor" value={t.provider} onChange={(e) => upd(t.task, { provider: e.target.value, model: data.defaults[e.target.value]?.[t.task] ?? t.model })}>{Object.entries(PROV).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</SelectField>
+            <FormField label="Modelo" value={t.model} onChange={(e) => upd(t.task, { model: e.target.value })} />
+          </div>
+        ))}
+        <p className="t-meta">Los nombres de modelo cambian con el tiempo: verifícalos en la documentación del proveedor.</p>
+        <Button variant="secondary" onClick={saveTasks}>Guardar modelos</Button>
+      </div>
+      <p className="t-meta border-t border-line pt-3">Uso de hoy: {data.usageToday.calls} de {data.usageToday.limit} llamadas · {(data.usageToday.tokensIn + data.usageToday.tokensOut).toLocaleString('es')} tokens.</p>
+      <Sheet open={!!keyFor} onClose={() => setKeyFor(null)} title={`Clave de ${keyFor ? PROV[keyFor] : ''}`}>
+        <form onSubmit={saveKey} className="flex flex-col gap-3">
+          <FormField label="Clave API" name="key" type="password" autoComplete="off" required minLength={10} autoFocus hint="Se cifra en el servidor y no se vuelve a mostrar." />
+          <Button type="submit" block>Guardar</Button>
+        </form>
+      </Sheet>
+    </div>
+  );
+}
+
+type Tok = { id: string; label: string; createdAt: string; lastUsedAt: string | null };
+function Health() {
+  const toast = useToast();
   const [toks, setToks] = useState<Tok[]>([]);
   const [fresh, setFresh] = useState('');
-  const load = useCallback(() => api<{ items: Tok[] }>('/health/tokens').then((r) => setToks(r.items)), []);
+  const load = useCallback(() => api<{ items: Tok[] }>('/health/tokens').then((r) => setToks(r.items)).catch(() => undefined), []);
   useEffect(() => { load(); }, [load]);
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -79,30 +172,35 @@ function Health({ say }: { say: (m: string) => void }) {
     const r = await api<{ token: string }>('/health/tokens', { method: 'POST', body: JSON.stringify({ label }) });
     setFresh(r.token); e.currentTarget.reset(); load();
   }
-  async function revoke(id: string) { await api(`/health/tokens/${id}`, { method: 'DELETE' }); load(); say('Token revocado.'); }
   const url = `${location.origin}/api/health/ingest`;
   const sample = JSON.stringify({ days: [{ date: '2026-11-04', steps: 8421, activeKcal: 410, restingKcal: 1950, distanceKm: 6.1, exerciseMin: 38 }], sleep: [{ date: '2026-11-04', sleepAt: '2026-11-03T22:45:00Z', wakeAt: '2026-11-04T06:15:00Z' }] }, null, 1);
   return (
-    <section className="card flex flex-col gap-3">
-      <h2 className="font-semibold">Apple Health (mediante Atajos)</h2>
-      <p className="text-sm text-slate-600 dark:text-slate-300">Una web no puede leer HealthKit. Alternativa sin app nativa: un Atajo de iOS lee Salud y envía los datos a tu servidor con un token personal que solo permite <b>escribir</b> datos de salud. Pide permisos de Salud de forma explícita la primera vez que ejecutas el Atajo.</p>
-      <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-600 dark:text-slate-300">
-        <li>Crea un token aquí abajo y cópialo (solo se muestra una vez).</li>
-        <li>En Atajos: acción <i>Buscar muestras de salud</i> (Pasos, Energía activa, Energía en reposo, Distancia, Minutos de ejercicio, Sueño) del día de hoy.</li>
-        <li>Acción <i>Obtener contenido de URL</i>: POST a <code className="break-all">{url}</code>, cabecera <code>Authorization: Bearer &lt;token&gt;</code>, cuerpo JSON como el ejemplo.</li>
-        <li>Automatización: «Hora del día» (p. ej. 23:30) → ejecutar el Atajo.</li>
+    <div className="flex flex-col gap-4">
+      <ol className="list-decimal space-y-1.5 pl-5 text-sm text-ink-2">
+        <li>Crea un token y cópialo (solo se muestra una vez). Solo permite <b>enviar</b> datos de salud.</li>
+        <li>En Atajos: <i>Buscar muestras de salud</i> (pasos, energía activa y en reposo, distancia, ejercicio, sueño) de hoy.</li>
+        <li><i>Obtener contenido de URL</i>: POST a <code className="break-all text-ink">{url}</code> con la cabecera <code className="text-ink">Authorization: Bearer &lt;token&gt;</code> y un cuerpo JSON.</li>
+        <li>Automatización «Hora del día» (p. ej. 23:30) que ejecute el Atajo.</li>
       </ol>
-      <details><summary className="text-sm">Ejemplo de cuerpo JSON</summary><pre className="mt-2 overflow-x-auto rounded-xl bg-slate-100 p-3 text-xs dark:bg-[#1b2430]">{sample}</pre>
-        <p className="mt-1 text-xs text-slate-500">Todos los campos son opcionales: lo que no envíes queda sin dato (nunca se rellena con 0). Reenviar el mismo día actualiza, no duplica. También admite <code>weights</code> y <code>workouts</code>.</p></details>
-      <p className="text-xs text-slate-500">Limitación: las automatizaciones de Atajos corren a horas fijas y iOS puede pedir confirmación; no es sincronización en tiempo real.</p>
-      {fresh && <div role="alert" className="rounded-xl border border-amber-500 bg-amber-500/10 p-3 text-sm"><b>Copia tu token ahora; no volverá a mostrarse:</b><code className="mt-1 block break-all select-all">{fresh}</code><button className="mt-2 text-xs underline" onClick={() => setFresh('')}>Ya lo he copiado</button></div>}
-      <ul className="text-sm">{toks.map((t) => <li key={t.id} className="flex items-center justify-between border-t border-slate-200 py-2 dark:border-slate-800"><span><b>{t.label}</b><span className="block text-xs text-slate-500">{t.lastUsedAt ? `último uso: ${new Date(t.lastUsedAt).toLocaleString('es')}` : 'sin usar todavía'}</span></span><button className="text-red-500" onClick={() => revoke(t.id)}>Revocar</button></li>)}</ul>
-      <form onSubmit={create} className="flex gap-2"><input name="label" className="input" placeholder="Nombre (p. ej. iPhone)" required maxLength={40} /><button className="btn shrink-0">Crear token</button></form>
-    </section>
+      <details><summary className="min-h-9 cursor-pointer py-1.5 text-sm font-medium text-ink-2">Ejemplo de cuerpo JSON</summary>
+        <pre className="mt-1 overflow-x-auto rounded-ctl bg-surface-2 p-3 text-xs">{sample}</pre>
+        <p className="t-meta mt-2">Todo es opcional: lo que no envíes queda sin dato (nunca se rellena con 0). Reenviar el mismo día actualiza sin duplicar.</p></details>
+      <Notice tone="info">Limitación: las automatizaciones de Atajos corren a horas fijas y iOS puede pedir confirmación. No es sincronización en tiempo real.</Notice>
+      {fresh && <Notice tone="warn"><b>Copia el token ahora; no volverá a mostrarse:</b><code className="mt-1 block select-all break-all">{fresh}</code><button className="mt-2 min-h-9 text-xs font-medium underline" onClick={() => setFresh('')}>Ya lo he copiado</button></Notice>}
+      <ul>{toks.map((t) => (
+        <li key={t.id} className="flex min-h-14 items-center justify-between gap-3 border-t border-line first:border-0">
+          <span><span className="font-medium">{t.label}</span><span className="t-meta block">{t.lastUsedAt ? `Último uso: ${new Date(t.lastUsedAt).toLocaleString('es')}` : 'Sin usar todavía'}</span></span>
+          <Button variant="danger" size="sm" onClick={async () => { await api(`/health/tokens/${t.id}`, { method: 'DELETE' }); toast('Token revocado'); load(); }}>Revocar</Button>
+        </li>))}</ul>
+      <form onSubmit={create} className="flex items-end gap-2"><FormField className="flex-1" label="Nuevo token" name="label" placeholder="iPhone" required maxLength={40} /><Button type="submit">Crear</Button></form>
+    </div>
   );
 }
 
-function Notifications({ say }: { say: (m: string) => void }) {
+type Reminder = { kind: string; enabled: boolean; timeLocal: string; weekdays: number[] };
+type PushCfg = { enabled: boolean; publicKey: string | null; cronConfigured: boolean };
+function Notifications() {
+  const toast = useToast();
   const [cfg, setCfg] = useState<PushCfg | null>(null);
   const [items, setItems] = useState<Reminder[]>([]);
   const [subscribed, setSubscribed] = useState(false);
@@ -111,59 +209,47 @@ function Notifications({ say }: { say: (m: string) => void }) {
   const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
   useEffect(() => {
-    api<PushCfg>('/push/config').then(setCfg);
-    api<{ items: Reminder[] }>('/reminders').then((r) => setItems(r.items));
+    api<PushCfg>('/push/config').then(setCfg).catch(() => undefined);
+    api<{ items: Reminder[] }>('/reminders').then((r) => setItems(r.items)).catch(() => undefined);
     if (supported) navigator.serviceWorker.getRegistration().then((r) => r?.pushManager.getSubscription()).then((s) => setSubscribed(!!s)).catch(() => undefined);
   }, [supported]);
 
   async function enable() {
     if (!cfg?.publicKey) return;
-    const perm = await Notification.requestPermission(); // petición explícita, tras pulsar el botón
-    if (perm !== 'granted') { say('Permiso de notificaciones denegado. Puedes cambiarlo en los ajustes del navegador/iOS.'); return; }
+    if ((await Notification.requestPermission()) !== 'granted') { toast('Permiso denegado. Puedes cambiarlo en los ajustes del sistema.', 'error'); return; }
     const reg = (await navigator.serviceWorker.getRegistration()) ?? (await navigator.serviceWorker.register('/sw.js'));
     await navigator.serviceWorker.ready;
     const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(cfg.publicKey) }));
     await api('/push/subscribe', { method: 'POST', body: JSON.stringify(sub.toJSON()) });
-    setSubscribed(true); say('Notificaciones activadas en este dispositivo.');
+    setSubscribed(true); toast('Notificaciones activadas en este dispositivo');
   }
   async function disable() {
-    const reg = await navigator.serviceWorker.getRegistration();
-    const sub = await reg?.pushManager.getSubscription();
+    const sub = await (await navigator.serviceWorker.getRegistration())?.pushManager.getSubscription();
     if (sub) { await api('/push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint: sub.endpoint }) }); await sub.unsubscribe(); }
-    setSubscribed(false); say('Notificaciones desactivadas en este dispositivo.');
-  }
-  async function test() {
-    try { const r = await api<{ sent: number }>('/push/test', { method: 'POST' }); say(r.sent ? 'Notificación de prueba enviada.' : 'No se pudo enviar.'); } catch { say('No se pudo enviar la prueba.'); }
-  }
-  async function save() {
-    await api('/reminders', { method: 'PUT', body: JSON.stringify({ items }) }); say('Recordatorios guardados.');
+    setSubscribed(false); toast('Notificaciones desactivadas aquí');
   }
   const upd = (kind: string, patch: Partial<Reminder>) => setItems((xs) => xs.map((x) => (x.kind === kind ? { ...x, ...patch } : x)));
 
   return (
-    <section className="card flex flex-col gap-3">
-      <h2 className="font-semibold">Recordatorios</h2>
-      <p className="text-xs text-slate-500">Todos desactivados por defecto. Solo se envía un aviso por tipo y día, y únicamente si aún no has hecho lo que recuerda (p. ej. no avisa del desayuno si ya lo registraste).</p>
-      {!supported && <p className="text-sm text-amber-500">Este navegador no admite notificaciones push.</p>}
-      {supported && isIos && !standalone && <p className="text-sm text-amber-500">En iPhone las notificaciones solo funcionan con la app instalada: Safari → Compartir → «Añadir a pantalla de inicio» (iOS 16.4 o superior) y ábrela desde el icono.</p>}
-      {cfg && !cfg.enabled && <p className="text-sm text-amber-500">El servidor no tiene claves VAPID configuradas, por lo que no puede enviar notificaciones (ver README).</p>}
-      {cfg?.enabled && !cfg.cronConfigured && <p className="text-sm text-amber-500">Falta CRON_SECRET en el servidor: sin un programador externo no se enviarán avisos automáticos.</p>}
-      {supported && cfg?.enabled && (
-        <div className="flex gap-2">
-          {subscribed ? <><button className="flex-1 rounded-xl border border-slate-300 py-2 text-sm dark:border-slate-700" onClick={test}>Enviar prueba</button><button className="flex-1 rounded-xl py-2 text-sm text-red-500" onClick={disable}>Desactivar aquí</button></> : <button className="btn w-full" onClick={enable}>Activar notificaciones en este dispositivo</button>}
-        </div>
-      )}
-      <ul>
-        {items.map((r) => (
-          <li key={r.kind} className="border-t border-slate-200 py-2 dark:border-slate-800">
-            <div className="flex items-center justify-between gap-2"><label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4" checked={r.enabled} onChange={(e) => upd(r.kind, { enabled: e.target.checked })} />{KIND_LABEL[r.kind] ?? r.kind}</label>
-              <input type="time" value={r.timeLocal} onChange={(e) => upd(r.kind, { timeLocal: e.target.value })} className="rounded-lg border border-slate-300 bg-transparent px-2 py-1 text-sm dark:border-slate-700" aria-label="Hora" /></div>
-            {r.enabled && <div className="mt-1 flex gap-1">{DAYS.map((d, i) => { const on = r.weekdays.includes(i + 1); return <button key={d} type="button" aria-pressed={on} className={`size-8 rounded-full text-xs ${on ? 'bg-accent text-[#052e1d]' : 'bg-slate-200 text-slate-500 dark:bg-slate-800'}`} onClick={() => { const w = on ? r.weekdays.filter((x) => x !== i + 1) : [...r.weekdays, i + 1].sort(); if (w.length) upd(r.kind, { weekdays: w }); }}>{d}</button>; })}</div>}
-          </li>
-        ))}
-      </ul>
-      <p className="text-xs text-slate-500">«Avisarme si llevo horas sin moverme» no es posible: requiere movimiento en tiempo real, y Apple Health solo llega al servidor en las sincronizaciones del Atajo.</p>
-      <button className="btn" onClick={save}>Guardar recordatorios</button>
-    </section>
+    <div className="flex flex-col gap-4">
+      <p className="t-meta">Todos desactivados por defecto. Un aviso por tipo y día, y solo si aún no has hecho lo que recuerda.</p>
+      {!supported && <Notice tone="warn">Este navegador no admite notificaciones push.</Notice>}
+      {supported && isIos && !standalone && <Notice tone="warn">En iPhone solo funcionan con la app instalada: Safari → Compartir → «Añadir a pantalla de inicio» (iOS 16.4 o superior) y ábrela desde el icono.</Notice>}
+      {cfg && !cfg.enabled && <Notice tone="info">El servidor no tiene claves VAPID configuradas, así que no puede enviar notificaciones.</Notice>}
+      {cfg?.enabled && !cfg.cronConfigured && <Notice tone="info">Falta CRON_SECRET en el servidor: sin un programador externo no se enviarán avisos automáticos.</Notice>}
+      {supported && cfg?.enabled && (subscribed
+        ? <div className="flex gap-2"><Button variant="secondary" className="flex-1" onClick={async () => { try { const r = await api<{ sent: number }>('/push/test', { method: 'POST' }); toast(r.sent ? 'Prueba enviada' : 'No se pudo enviar', r.sent ? 'success' : 'error'); } catch { toast('No se pudo enviar la prueba', 'error'); } }}>Enviar prueba</Button><Button variant="ghost" onClick={disable}>Desactivar aquí</Button></div>
+        : <Button onClick={enable} block>Activar en este dispositivo</Button>)}
+      <ul>{items.map((r) => (
+        <li key={r.kind} className="border-t border-line py-3 first:border-0">
+          <div className="flex min-h-11 items-center justify-between gap-3">
+            <label className="flex flex-1 items-center gap-3 text-sm"><input type="checkbox" className="size-5 accent-[var(--accent)]" checked={r.enabled} onChange={(e) => upd(r.kind, { enabled: e.target.checked })} />{KIND_LABEL[r.kind] ?? r.kind}</label>
+            <input type="time" value={r.timeLocal} onChange={(e) => upd(r.kind, { timeLocal: e.target.value })} aria-label={`Hora: ${KIND_LABEL[r.kind] ?? r.kind}`} className="min-h-10 rounded-ctl border border-line-strong bg-surface px-2 text-sm" />
+          </div>
+          {r.enabled && <div className="mt-2 flex gap-1.5 pl-8">{DAYS.map((d, i) => { const on = r.weekdays.includes(i + 1); return <button key={d} type="button" aria-pressed={on} aria-label={['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'][i]} className={cx('size-9 rounded-full text-xs font-semibold transition', on ? 'bg-accent text-accent-ink' : 'bg-surface-2 text-ink-2')} onClick={() => { const w = on ? r.weekdays.filter((x) => x !== i + 1) : [...r.weekdays, i + 1].sort(); if (w.length) upd(r.kind, { weekdays: w }); }}>{d}</button>; })}</div>}
+        </li>))}</ul>
+      <p className="t-meta">«Avisarme si llevo horas sin moverme» no es posible: requiere movimiento en tiempo real.</p>
+      <Button variant="secondary" onClick={async () => { await api('/reminders', { method: 'PUT', body: JSON.stringify({ items }) }); toast('Recordatorios guardados'); }}>Guardar recordatorios</Button>
+    </div>
   );
 }
