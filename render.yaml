@@ -4,6 +4,7 @@ services:
     name: fittrack
     runtime: docker
     plan: free
+    region: frankfurt   # misma región que Neon (eu-central-1): cada consulta a la BD cruza menos red. No se puede cambiar en un servicio ya creado.
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL        # Neon: URL CON pool (host con -pooler); 'neon env pull' la escribe como DATABASE_URL

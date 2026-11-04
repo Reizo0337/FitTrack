@@ -82,6 +82,12 @@ export async function buildApp(env: Env, prisma: PrismaClient, deps: { fetch?: t
   const globalMax = env.RATE_LIMIT_MAX ?? (env.NODE_ENV === 'test' ? 0 : 300);
   await app.register(rateLimit, globalMax ? { global: true, max: globalMax, timeWindow: '1 minute' } : { global: false });
 
+  // Diagnóstico de rendimiento: las peticiones que tardan más de 1 s quedan en los logs del servidor.
+  app.addHook('onResponse', (req, reply, done) => {
+    if (reply.elapsedTime > 1000) req.log.warn({ url: req.url.split('?')[0], method: req.method, ms: Math.round(reply.elapsedTime) }, 'petición lenta');
+    done();
+  });
+
   app.decorate('authenticate', async (req: FastifyRequest, reply: FastifyReply) => {
     try {
       await req.jwtVerify();

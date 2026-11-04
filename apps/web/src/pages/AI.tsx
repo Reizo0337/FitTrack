@@ -1,4 +1,4 @@
-import { ArrowUp, KeyRound, Sparkles } from 'lucide-react';
+import { ArrowUp, KeyRound, Mic, MicOff, Sparkles, Square, Volume2, VolumeX } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
@@ -11,7 +11,8 @@ import { chipClass, friendly } from '../components/ai/shared';
 import { PageHeader } from '../components/PageHeader';
 import { todayStr } from '../ctx';
 import { useData } from '../hooks';
-import { Button, Card, EmptyState, ErrorState, LoadingState, Segmented, cx } from '../ui/primitives';
+import { plainSpeech, useDictation, useSpeaker } from '../voice';
+import { Button, Card, EmptyState, ErrorState, IconButton, LoadingState, Notice, Segmented, cx } from '../ui/primitives';
 
 type Msg = { role: 'user' | 'assistant'; content: string; error?: boolean };
 type Cfg = { consent: boolean; providers: { provider: string; hasKey: boolean }[]; tasks: { task: string; provider: string; model: string }[]; usageToday: { calls: number; limit: number } };
@@ -59,20 +60,48 @@ function ChatTab({ usage }: { usage: { calls: number; limit: number } }) {
   const [convo, setConvo] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [text, setText] = useState('');
+  // Modo voz: se envía solo al terminar de hablar y se lee la respuesta en voz alta.
+  const [voiceMode, setVoiceMode] = useState(() => { try { return localStorage.getItem('voiceMode') === '1'; } catch { return false; } });
+  const baseText = useRef('');
   const end = useRef<HTMLDivElement>(null);
+  const speaker = useSpeaker();
+  const voiceRef = useRef(voiceMode);
+  voiceRef.current = voiceMode;
   useEffect(() => { if (msgs.length) end.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [msgs, busy]);
 
   async function send(message: string) {
     const m = message.trim();
     if (!m || busy) return;
+    speaker.stop();
     setMsgs((x) => [...x, { role: 'user', content: m }]); setText(''); setBusy(true);
     try {
       const r = await api<{ conversationId: string; reply: string }>('/ai/chat', { method: 'POST', body: JSON.stringify({ message: m, conversationId: convo, date: todayStr() }) });
       setConvo(r.conversationId);
       setMsgs((x) => [...x, { role: 'assistant', content: r.reply }]);
+      if (voiceRef.current) speaker.speak(plainSpeech(r.reply));
     } catch (e) {
       setMsgs((x) => [...x, { role: 'assistant', content: friendly(e), error: true }]);
     } finally { setBusy(false); }
+  }
+
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  const dictation = useDictation(
+    (interim) => setText(`${baseText.current} ${interim}`.trim()),
+    (final) => { const full = `${baseText.current} ${final}`.trim(); setText(full); if (voiceRef.current) sendRef.current(full); },
+  );
+
+  function toggleMic() {
+    if (dictation.listening) { dictation.stop(); return; }
+    speaker.stop(); speaker.unlock();
+    baseText.current = text.trim();
+    dictation.start();
+  }
+  function toggleVoiceMode() {
+    const on = !voiceMode;
+    setVoiceMode(on);
+    try { localStorage.setItem('voiceMode', on ? '1' : '0'); } catch { /* sin almacenamiento */ }
+    if (on) speaker.unlock(); else speaker.stop();
   }
 
   return (
@@ -81,7 +110,7 @@ function ChatTab({ usage }: { usage: { calls: number; limit: number } }) {
         {msgs.length === 0 ? (
           <div className="pt-2">
             <div className="mb-5 flex items-start gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent-strong"><Sparkles className="size-[18px]" aria-hidden /></span>
-              <p className="t-body pt-1">Hola. Puedo consultar tus comidas, peso, actividad y sueño registrados para orientarte. No soy un médico: para temas de salud consulta a un profesional.</p></div>
+              <p className="t-body pt-1">Hola. Puedo consultar tus comidas, peso, actividad y sueño registrados para orientarte. No soy un médico: para temas de salud consulta a un profesional.{dictation.supported ? ' Puedes escribirme o hablarme con el micrófono.' : ''}</p></div>
             <p className="t-over mb-2">Prueba a preguntar</p>
             <ul className="flex flex-wrap gap-2">{SUGGESTIONS.map((s) => <li key={s}><button onClick={() => send(s)} className={chipClass(false)}>{s}</button></li>)}</ul>
           </div>
@@ -100,13 +129,32 @@ function ChatTab({ usage }: { usage: { calls: number; limit: number } }) {
         )}
         <div ref={end} />
       </div>
-      <form onSubmit={(e: FormEvent) => { e.preventDefault(); send(text); }}
-        className="sticky z-10 flex items-end gap-2 bg-bg pb-3 pt-2 max-lg:bottom-[calc(3.25rem+env(safe-area-inset-bottom))] lg:bottom-0">
-        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={1} maxLength={2000} placeholder="Pregunta sobre tu alimentación…" aria-label="Mensaje"
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(text); } }}
-          className="max-h-32 min-h-11 flex-1 resize-none rounded-[22px] border border-line-strong bg-surface px-4 py-2.5 placeholder:text-ink-3 focus:border-accent focus:outline-none" />
-        <Button type="submit" aria-label="Enviar" disabled={!text.trim()} loading={busy} className="!size-11 !rounded-full !px-0" icon={ArrowUp} />
-      </form>
+
+      <div className="sticky z-10 bg-bg pb-3 pt-2 max-lg:bottom-[calc(3.25rem+env(safe-area-inset-bottom))] lg:bottom-0">
+        {dictation.error && <div className="mb-2"><Notice tone="warn">{dictation.error}</Notice></div>}
+        <form onSubmit={(e: FormEvent) => { e.preventDefault(); send(text); }} className="flex items-end gap-2">
+          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={1} maxLength={2000} aria-label="Mensaje"
+            placeholder={dictation.listening ? 'Escuchando… habla ahora' : 'Pregunta sobre tu alimentación…'}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(text); } }}
+            className="max-h-32 min-h-11 flex-1 resize-none rounded-[22px] border border-line-strong bg-surface px-4 py-2.5 placeholder:text-ink-3 focus:border-accent focus:outline-none" />
+          {dictation.supported && (
+            <IconButton type="button" icon={dictation.listening ? MicOff : Mic} label={dictation.listening ? 'Dejar de escuchar' : 'Hablar con el micrófono'} aria-pressed={dictation.listening}
+              tone={dictation.listening ? 'danger' : 'default'} className={cx('border border-line-strong', dictation.listening && 'animate-pulse')} onClick={toggleMic} />
+          )}
+          <Button type="submit" aria-label="Enviar" disabled={!text.trim()} loading={busy} className="!size-11 !rounded-full !px-0" icon={ArrowUp} />
+        </form>
+        {(dictation.supported || speaker.supported) && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {dictation.supported && speaker.supported && (
+              <Button variant={voiceMode ? 'primary' : 'secondary'} size="sm" icon={voiceMode ? Volume2 : VolumeX} aria-pressed={voiceMode} onClick={toggleVoiceMode}>Modo voz {voiceMode ? 'activado' : 'desactivado'}</Button>
+            )}
+            {speaker.speaking && <Button variant="ghost" size="sm" icon={Square} onClick={speaker.stop}>Parar lectura</Button>}
+            {dictation.listening && <span role="status" className="t-meta flex items-center gap-1.5"><i className="size-2 animate-pulse rounded-full bg-danger" aria-hidden />Escuchando…</span>}
+          </div>
+        )}
+        {!dictation.supported && <p className="t-meta mt-2">Este navegador no admite dictado por voz. En el iPhone puedes usar el micrófono del teclado.</p>}
+        {voiceMode && <p className="t-meta mt-2">Modo voz: al terminar de hablar se envía el mensaje y se lee la respuesta. El audio lo procesa el servicio de voz de tu navegador (Apple o Google).</p>}
+      </div>
       <p className="t-meta pb-2 text-center">Orientación nutricional con estimaciones; no sustituye a un profesional sanitario. {usage.calls}/{usage.limit} consultas hoy.</p>
     </div>
   );

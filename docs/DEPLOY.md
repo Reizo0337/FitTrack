@@ -67,3 +67,12 @@ HTTPS obligatorio (Render), sesión con token de 15 min + refresh rotatorio Http
 
 ## 8. Actualizar
 `git push` → Render reconstruye y migra. Antes de cambios de esquema, comprueba que existe una copia reciente.
+
+## 9. Si la app va lenta
+Causas, de más a menos probable en el plan gratuito:
+1. **Servicio dormido (Render).** Tras ~15 min sin tráfico se apaga y la primera petición tarda 30-60 s. Un monitor externo que llame a `/api/health` cada 10 min lo mantiene despierto (UptimeRobot o cron-job.org, gratis; el plan gratuito da 750 h/mes, suficiente para un servicio 24/7). Esa ruta no toca la base de datos.
+2. **Región distinta entre Render y Neon.** Neon está en `eu-central-1` (Fráncfurt). Si Render está en otra región (p. ej. Oregón, el valor por defecto) cada consulta suma ~150 ms y la pantalla de Inicio hace ~30. La región de un servicio de Render **no se puede cambiar**: hay que crear uno nuevo en Fráncfurt (`region: frankfurt` en `render.yaml`) y mover las variables de entorno.
+3. **CPU limitada del plan gratuito** (0,1 vCPU): el inicio de sesión (scrypt, deliberadamente costoso) y las ráfagas de peticiones se notan. Solo afecta al login, que se hace una vez al mes.
+4. **Neon escala a cero** tras 5 min sin uso: la primera consulta tarda ~1 s más.
+
+Diagnóstico: las peticiones de más de 1 s se registran en los logs de Render como `petición lenta` con su ruta y milisegundos.
