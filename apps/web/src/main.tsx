@@ -9,6 +9,8 @@ const stored = localStorage.getItem('theme');
 const dark = stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
 document.documentElement.classList.toggle('dark', dark);
 
+if ('serviceWorker' in navigator && import.meta.env.PROD) navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>

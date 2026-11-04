@@ -13,12 +13,16 @@ import { dashboardRoutes } from './modules/dashboard/routes';
 import { diaryRoutes } from './modules/diary/routes';
 import { foodRoutes } from './modules/foods/routes';
 import { weightRoutes } from './modules/weight/routes';
+import { activityRoutes } from './modules/activity/routes';
+import { healthRoutes } from './modules/health/routes';
+import { reminderRoutes } from './modules/reminders/routes';
 
 declare module 'fastify' {
   interface FastifyInstance {
     prisma: PrismaClient;
     env: Env;
     fetchImpl: typeof fetch;
+    pushSender?: import('./modules/reminders/service').Sender;
     authenticate: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }
@@ -29,7 +33,7 @@ declare module '@fastify/jwt' {
   }
 }
 
-export async function buildApp(env: Env, prisma: PrismaClient, deps: { fetch?: typeof fetch } = {}) {
+export async function buildApp(env: Env, prisma: PrismaClient, deps: { fetch?: typeof fetch; pushSender?: import('./modules/reminders/service').Sender } = {}) {
   const app = Fastify({
     logger: env.NODE_ENV === 'test' ? false : { level: 'info', redact: ['req.headers.authorization', 'req.headers.cookie'] },
     bodyLimit: 1_000_000,
@@ -38,6 +42,7 @@ export async function buildApp(env: Env, prisma: PrismaClient, deps: { fetch?: t
   app.decorate('prisma', prisma);
   app.decorate('env', env);
   app.decorate('fetchImpl', deps.fetch ?? fetch);
+  app.decorate('pushSender', deps.pushSender);
 
   await app.register(helmet);
   await app.register(cors, {
@@ -71,6 +76,9 @@ export async function buildApp(env: Env, prisma: PrismaClient, deps: { fetch?: t
   await app.register(diaryRoutes, { prefix: '/api/diary' });
   await app.register(weightRoutes, { prefix: '/api/weight' });
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' });
+  await app.register(activityRoutes, { prefix: '/api/activity' });
+  await app.register(healthRoutes, { prefix: '/api/health' });
+  await app.register(reminderRoutes, { prefix: '/api' });
 
   return app;
 }

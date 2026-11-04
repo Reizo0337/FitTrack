@@ -3,7 +3,7 @@ import type { UserProfile } from '@prisma/client';
 import type { FastifyPluginAsync } from 'fastify';
 
 /** Valores derivados: son ESTIMACIONES a partir de fórmulas, no valores médicos. */
-function derive(p: UserProfile, currentKg: number) {
+export function derive(p: UserProfile, currentKg: number) {
   const bmr = bmrMifflin({ sex: p.sex, weightKg: currentKg, heightCm: p.heightCm, ageYears: ageFromBirthDate(p.birthDate) });
   const tdee = tdeeFromBmr(bmr, p.activityLevel);
   const weekly = expectedWeeklyLossKg(tdee - p.targetKcal);

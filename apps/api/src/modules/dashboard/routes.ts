@@ -11,14 +11,20 @@ export const dashboardRoutes: FastifyPluginAsync = async (app) => {
   app.get('/', async (req) => {
     const { date } = z.object({ date: localDate }).parse(req.query);
     const userId = req.user.sub;
-    const [diary, profile, weights, history, activity, sleep] = await Promise.all([
+    const [diary, profile, weights, history, activityRows, sleepRows] = await Promise.all([
       buildDiary(db, userId, date),
       db.userProfile.findUniqueOrThrow({ where: { userId } }),
       db.weightEntry.findMany({ where: { userId, localDate: { lte: toDbDate(date) } }, orderBy: [{ localDate: 'desc' }, { measuredAt: 'desc' }], take: 60 }),
       db.dailyNutrition.findMany({ where: { userId, localDate: { gte: toDbDate(addDays(date, -13)), lte: toDbDate(date) } }, orderBy: { localDate: 'asc' } }),
-      db.activityRecord.findFirst({ where: { userId, localDate: toDbDate(date) }, orderBy: { updatedAt: 'desc' } }),
-      db.sleepRecord.findFirst({ where: { userId, localDate: toDbDate(date) }, orderBy: { totalMin: { sort: 'desc', nulls: 'last' } } }),
+      db.activityRecord.findMany({ where: { userId, localDate: toDbDate(date) } }),
+      db.sleepRecord.findMany({ where: { userId, localDate: toDbDate(date) } }),
     ]);
+    // Health tiene prioridad campo a campo sobre lo manual; nunca se suman fuentes (evita contar dos veces).
+    const aH = activityRows.find((a) => a.source === 'HEALTH'), aM = activityRows.find((a) => a.source === 'MANUAL');
+    const pickA = <K extends 'steps' | 'activeKcal' | 'restingKcal' | 'distanceKm' | 'exerciseMin'>(k: K) => aH?.[k] ?? aM?.[k] ?? null;
+    const activity = activityRows.length ? { steps: pickA('steps'), activeKcal: pickA('activeKcal'), restingKcal: pickA('restingKcal'), distanceKm: pickA('distanceKm'), exerciseMin: pickA('exerciseMin'), source: aH ? 'HEALTH' : 'MANUAL' } : null;
+    const sleepRow = sleepRows.find((s) => s.source === 'HEALTH') ?? sleepRows[0];
+    const sleep = sleepRow ? { totalMin: sleepRow.totalMin, source: sleepRow.source } : null;
 
     const latest = weights[0];
     const currentKg = latest?.weightKg ?? null;
@@ -48,8 +54,8 @@ export const dashboardRoutes: FastifyPluginAsync = async (app) => {
         note: 'Solo se dispone del peso total: no se puede afirmar cuánta grasa has perdido sin medir composición corporal.',
       },
       // Se rellenan con Apple Health / registro manual (Fase 4). Sin datos => null, nunca inventados.
-      activity: activity ? { steps: activity.steps, activeKcal: activity.activeKcal, restingKcal: activity.restingKcal, distanceKm: activity.distanceKm, exerciseMin: activity.exerciseMin, source: activity.source } : null,
-      sleep: sleep ? { totalMin: sleep.totalMin, source: sleep.source } : null,
+      activity,
+      sleep,
       history: history.map((h) => ({ date: fromDbDate(h.localDate), kcal: h.kcal, protein: h.protein, carbs: h.carbs, fat: h.fat })),
     };
   });

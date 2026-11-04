@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { MEAL_LABELS, MEAL_TYPES, nutrientsLookInconsistent, scaleFromPer100, type FoodItem, type MealTypeId } from '@fittrack/shared';
+import { MEAL_LABELS, MEAL_TYPES, nutrientsLookInconsistent, parseNutritionText, scaleFromPer100, type FoodItem, type MealTypeId } from '@fittrack/shared';
 import { api, ApiError } from '../api';
 import { defaultMeal, useApp } from '../ctx';
 
@@ -130,6 +130,24 @@ const FIELDS: [string, string, boolean][] = [
 
 function Create({ prefill, onCreated }: { prefill: { barcode?: string; msg?: string }; onCreated: (i: FoodItem) => void }) {
   const [err, setErr] = useState('');
+  const [vals, setVals] = useState<Record<string, string>>({});
+  const [rev, setRev] = useState(0);
+  const [ocr, setOcr] = useState('');
+
+  // OCR local (Tesseract.js en el navegador): la foto no sale del dispositivo. El resultado es solo una propuesta editable.
+  async function readLabel(file: File) {
+    setOcr('Leyendo etiqueta… (la primera vez descarga el modelo de idioma)');
+    try {
+      const { recognize } = await import('tesseract.js');
+      const { data } = await recognize(file, 'spa+eng');
+      const { values, per100 } = parseNutritionText(data.text);
+      const found = Object.keys(values).length;
+      if (!found) { setOcr('No se reconoció ninguna tabla nutricional. Prueba con más luz y la etiqueta recta, o introduce los valores a mano.'); return; }
+      setVals(Object.fromEntries(Object.entries(values).map(([k, v]) => [k, String(v)])));
+      setRev((r) => r + 1);
+      setOcr(`Se leyeron ${found} valores${per100 ? '' : ', pero NO se detectó “por 100 g”: comprueba que no sean valores por ración'}. Revísalos antes de guardar: el OCR puede equivocarse.`);
+    } catch { setOcr('No se pudo leer la imagen (¿sin conexión para descargar el modelo?). Introduce los valores a mano.'); }
+  }
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -143,13 +161,18 @@ function Create({ prefill, onCreated }: { prefill: { barcode?: string; msg?: str
     catch (e2) { setErr(e2 instanceof ApiError ? (e2.code === 'BARCODE_EXISTS' ? 'Ese código ya existe en tu base.' : 'Revisa los valores (por 100 g): proteínas+carbohidratos+grasas ≤ 100 y saturadas/azúcares no pueden superar a grasas/carbohidratos.') : 'Error'); }
   }
   return (
-    <form onSubmit={submit} className="flex flex-col gap-2">
+    <form key={rev} onSubmit={submit} className="flex flex-col gap-2">
       {prefill.msg && <p className="rounded-xl bg-amber-500/10 p-3 text-sm text-amber-600 dark:text-amber-400">{prefill.msg}</p>}
+      <label className="rounded-xl border border-dashed border-slate-400 p-3 text-center text-sm text-slate-500">
+        📷 Fotografiar la etiqueta nutricional (OCR)
+        <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) readLabel(f); }} />
+      </label>
+      {ocr && <p role="status" className="rounded-xl bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400">{ocr}</p>}
       <p className="text-xs text-slate-500">Introduce los valores <b>por 100 g</b> tal como figuran en la etiqueta. No los mezcles con los de “por ración”.</p>
       <input name="name" className="input" placeholder="Nombre" required maxLength={120} />
       <div className="grid grid-cols-2 gap-2"><input name="brand" className="input" placeholder="Marca (opcional)" /><input name="barcode" className="input" placeholder="Código de barras" inputMode="numeric" defaultValue={prefill.barcode} /></div>
       <div className="grid grid-cols-2 gap-2">
-        {FIELDS.map(([k, l, req]) => <label key={k} className="text-xs text-slate-500">{l}{req && ' *'}<input name={k} className="input mt-1" inputMode="decimal" required={req} /></label>)}
+        {FIELDS.map(([k, l, req]) => <label key={k} className="text-xs text-slate-500">{l}{req && ' *'}<input name={k} className="input mt-1" inputMode="decimal" required={req} defaultValue={vals[k]} /></label>)}
       </div>
       <div className="grid grid-cols-2 gap-2">
         <label className="text-xs text-slate-500">Peso de 1 ración (g)<input name="servingG" className="input mt-1" inputMode="decimal" /></label>
@@ -157,7 +180,6 @@ function Create({ prefill, onCreated }: { prefill: { barcode?: string; msg?: str
       </div>
       {err && <p role="alert" className="text-sm text-red-500">{err}</p>}
       <button className="btn">Guardar producto</button>
-      <p className="text-xs text-slate-500">Lectura de etiqueta con foto (OCR): llegará en la fase de integraciones.</p>
     </form>
   );
 }

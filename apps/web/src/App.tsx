@@ -4,7 +4,9 @@ import { login, logout, restoreSession } from './api';
 import { AppProvider, useApp } from './ctx';
 import { Food } from './pages/Food';
 import { Home } from './pages/Home';
+import { Activity } from './pages/Activity';
 import { Progress } from './pages/Progress';
+import { Settings } from './pages/Settings';
 import { Soon } from './pages/Soon';
 
 function Login({ onDone }: { onDone: () => void }) {
@@ -74,13 +76,15 @@ export function App() {
     <AppProvider>
     <div className="mx-auto min-h-screen max-w-2xl px-4 pb-28 pt-[max(1rem,env(safe-area-inset-top))]">
       <header className="mb-4 flex justify-end gap-2 text-sm">
+        <NavLink to="/settings" className="rounded-lg px-3 py-1 text-slate-500" aria-label="Ajustes">⚙️</NavLink>
         <button onClick={toggleTheme} className="rounded-lg px-3 py-1 text-slate-500" aria-label="Cambiar tema claro/oscuro">🌓</button>
         <button onClick={async () => { await logout(); setState('out'); }} className="rounded-lg px-3 py-1 text-slate-500">Salir</button>
       </header>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/food" element={<Food />} />
-        <Route path="/activity" element={<Soon title="Actividad" phase="Fase 4: Apple Health y sueño" />} />
+        <Route path="/activity" element={<Activity />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/progress" element={<Progress />} />
         <Route path="/ai" element={<Soon title="IA" phase="Fase 5: nutricionista y menús" />} />
       </Routes>

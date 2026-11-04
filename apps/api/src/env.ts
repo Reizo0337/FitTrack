@@ -9,6 +9,12 @@ const schema = z.object({
   /** Clave maestra (32 bytes en hex = 64 caracteres) para cifrar claves API en BD. */
   MASTER_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/, 'MASTER_KEY debe ser 64 caracteres hex'),
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
+  /** Notificaciones push (opcional). Genera con: npx web-push generate-vapid-keys */
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().default('mailto:admin@example.com'),
+  /** Secreto para que un cron externo llame a /api/internal/tick (opcional, >= 24 caracteres). */
+  CRON_SECRET: z.string().min(24).optional(),
 });
 
 export type Env = z.infer<typeof schema>;

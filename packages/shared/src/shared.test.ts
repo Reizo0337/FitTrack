@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assessPace, bmrMifflin, checkCalorieTarget, expectedWeeklyLossKg, movingAverage, scaleFromPer100, tdeeFromBmr, totalExpenditure, weeksToGoal } from './index';
+import { parseNutritionText, pearson, rollingAverageByDate, assessPace, bmrMifflin, checkCalorieTarget, expectedWeeklyLossKg, movingAverage, scaleFromPer100, tdeeFromBmr, totalExpenditure, weeksToGoal } from './index';
 
 const prozis100 = { kcal: 384, protein: 42, carbs: 33, fat: 9, satFat: 2.4, fiber: 1.7, sugars: 2.5, salt: 1 };
 
@@ -14,6 +14,29 @@ describe('nutrition', () => {
   });
   it('rechaza cantidades negativas', () => {
     expect(() => scaleFromPer100(prozis100, -1)).toThrow();
+  });
+});
+
+describe('OCR de etiquetas', () => {
+  it('extrae valores por 100 g de un texto de etiqueta y no inventa los que faltan', () => {
+    const txt = 'Información nutricional  por 100 g\nValor energético 1650 kJ / 394 kcal\nGrasas 8,5 g\nde las cuales saturadas 2,1 g\nHidratos de carbono 55 g\nde los cuales azúcares 4,2 g\nFibra alimentaria 6,3 g\nProteínas 12 g\nSal 1,1 g';
+    const r = parseNutritionText(txt);
+    expect(r.per100).toBe(true);
+    expect(r.values).toEqual({ kcal: 394, fat: 8.5, satFat: 2.1, carbs: 55, sugars: 4.2, fiber: 6.3, protein: 12, salt: 1.1 });
+    expect(parseNutritionText('texto sin datos').values).toEqual({});
+  });
+});
+
+describe('estadísticas', () => {
+  it('pearson exige datos suficientes y variación', () => {
+    expect(pearson([[1, 2], [2, 4]])).toBeNull();
+    const p = Array.from({ length: 8 }, (_, i) => [i, i * 2] as [number, number]);
+    expect(pearson(p)).toBe(1);
+    expect(pearson(Array.from({ length: 8 }, () => [1, 1] as [number, number]))).toBeNull();
+  });
+  it('rollingAverageByDate no inventa días sin dato', () => {
+    const r = rollingAverageByDate([{ date: '2026-11-01', value: 100 }, { date: '2026-11-10', value: 98 }], 7);
+    expect(r[1]!.avg).toBe(98);
   });
 });
 

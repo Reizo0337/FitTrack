@@ -68,6 +68,7 @@ model User {
   workouts     Workout[]
   sleep        SleepRecord[]
   reminders    Reminder[]
+  pushSubs     PushSubscription[]
   goals        Goal[]
   conversations AIConversation[]
   aiConfigs    AIProviderConfig[]
@@ -358,6 +359,18 @@ model Reminder {
   enabled   Boolean  @default(true)
   timeLocal String   // HH:mm
   weekdays  Int[]    // 1=lunes ... 7=domingo
+  lastSentAt DateTime? @db.Timestamptz
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, kind])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now()) @db.Timestamptz
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 

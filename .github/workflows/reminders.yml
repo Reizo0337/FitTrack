@@ -1,0 +1,21 @@
+# Programador externo de recordatorios. El hosting gratuito "duerme" el servidor, así que un cron externo lo despierta
+# y ejecuta /api/internal/tick, que envía solo los avisos que toquen (una vez por tipo y día, con ventana de recuperación de 90 min).
+# Configura en GitHub -> Settings -> Secrets and variables -> Actions:  API_URL (https://tu-api.onrender.com)  y  CRON_SECRET.
+# Cadencia 30 min: ~1.440 min/mes, dentro de los 2.000 gratuitos de repos privados (en repos públicos no cuenta).
+name: reminders
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Llamar al servidor
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail --silent --show-error --max-time 90 --retry 2 --retry-delay 10 \
+            -X POST -H "x-cron-secret: ${CRON_SECRET}" "${API_URL}/api/internal/tick"

@@ -3,11 +3,14 @@
 App personal de pérdida de grasa y nutrición. Monorepo: `apps/web` (React), `apps/api` (Fastify + Prisma + PostgreSQL), `packages/shared` (cálculos y esquemas Zod). Plan completo en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Estado
-Fases 2 y 3 completas. Fase 2: monorepo, esquema de BD completo + migración, login privado (sin registro público), perfil con estimaciones (BMR/TDEE/ritmo), seed de Prozis Army, shell web con tema claro/oscuro. Las pestañas Alimentación/Actividad/Progreso/IA están marcadas como "no implementado" hasta las fases 3-5.
+Fases 2, 3 y 4 completas. Fase 2: monorepo, esquema de BD completo + migración, login privado (sin registro público), perfil con estimaciones (BMR/TDEE/ritmo), seed de Prozis Army, shell web con tema claro/oscuro. La pestaña IA sigue marcada como "no implementado" hasta la Fase 5.
 
 ## Fase 3 (núcleo) — hecho
 Diario de comidas (5 tipos, gramos o unidades/raciones, repetir el día anterior, editar/borrar), base de alimentos propios y favoritos, producto Prozis con comprobación de las indicaciones del fabricante, búsqueda y escáner de códigos de barras con Open Food Facts (valores siempre por 100 g; los campos que faltan no se inventan), alimentos manuales, agua, peso con media de 7 días y comparación semanal/mensual, medidas corporales y panel con gráficas. El botón de escáner está accesible desde cualquier pantalla.
-**Pendiente:** OCR de etiquetas, fotos de progreso, Apple Health, sueño/actividad, notificaciones, IA (fases 4-5). La cámara del escáner no se ha podido probar en un dispositivo real: la búsqueda por código escrito sí.
+**Pendiente tras la Fase 4:** fotos de progreso, IA, retos, exportar/borrar datos. La cámara del escáner no se ha podido probar en un dispositivo real: la búsqueda por código escrito sí.
+
+## Fase 4 (integraciones) — hecho
+Apple Health por Atajos con token de ingesta e importación idempotente, actividad y sueño (manual o importado, sin doble conteo), estadísticas de sueño, OCR de etiquetas, ajustes de objetivos, recordatorios configurables con notificaciones push de PWA y programador externo. Detalle y límites en [docs/FASE4.md](docs/FASE4.md).
 
 ## Ejecutar en local (Windows/Mac/Linux, sin Docker)
 ```bash
