@@ -35,16 +35,16 @@ export function Activity() {
 
   async function saveActivity(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
+    const form = e.currentTarget; const f = new FormData(form);
     const n = (k: string) => (f.get(k) ? Number(String(f.get(k)).replace(',', '.')) : undefined);
     try {
       await api('/activity/activity', { method: 'POST', body: JSON.stringify({ date: String(f.get('date')), steps: n('steps'), activeKcal: n('activeKcal'), distanceKm: n('distanceKm'), exerciseMin: n('exerciseMin') }) });
-      e.currentTarget.reset(); setMsg('Actividad guardada.'); bump();
+      form.reset(); setMsg('Actividad guardada.'); bump();
     } catch { setMsg('Indica al menos un dato válido.'); }
   }
   async function saveSleep(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
+    const form = e.currentTarget; const f = new FormData(form);
     const date = String(f.get('date')), bed = String(f.get('bed') || ''), sleep = String(f.get('sleep') || ''), wake = String(f.get('wake') || '');
     const body: Record<string, unknown> = { date };
     if (wake) body.wakeAt = iso(date, wake);
@@ -53,7 +53,7 @@ export function Activity() {
     if (f.get('hours')) body.totalMin = Math.round(Number(String(f.get('hours')).replace(',', '.')) * 60);
     if (f.get('quality')) body.quality = Number(f.get('quality'));
     if (f.get('awakenings')) body.awakenings = Number(f.get('awakenings'));
-    try { await api('/activity/sleep', { method: 'POST', body: JSON.stringify(body) }); e.currentTarget.reset(); setMsg('Sueño guardado.'); bump(); }
+    try { await api('/activity/sleep', { method: 'POST', body: JSON.stringify(body) }); form.reset(); setMsg('Sueño guardado.'); bump(); }
     catch (er) { setMsg(er instanceof ApiError ? 'Indica las horas de dormir y despertar (o la duración) y comprueba que sean coherentes.' : 'Error'); }
   }
 

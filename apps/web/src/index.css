@@ -11,3 +11,9 @@ body { @apply bg-slate-50 text-slate-900 antialiased dark:bg-[#0b0f14] dark:text
 .card { @apply rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition dark:border-slate-800 dark:bg-[#141b24]; }
 .btn { @apply rounded-xl bg-accent px-4 py-3 font-semibold text-[#052e1d] active:scale-[.98] transition disabled:opacity-50; }
 .input { @apply w-full rounded-xl border border-slate-300 bg-white px-3 py-3 outline-none focus:border-accent dark:border-slate-700 dark:bg-[#1b2430]; }
+
+/* Accesibilidad: respeta la preferencia de menos movimiento y muestra el foco del teclado. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }

@@ -1,13 +1,16 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react';
 import { NavLink, Route, Routes } from 'react-router-dom';
 import { login, logout, restoreSession } from './api';
 import { AppProvider, useApp } from './ctx';
 import { Food } from './pages/Food';
 import { Home } from './pages/Home';
-import { Activity } from './pages/Activity';
-import { AI } from './pages/AI';
-import { Progress } from './pages/Progress';
-import { Settings } from './pages/Settings';
+
+// Páginas secundarias en carga diferida: el primer arranque descarga menos código.
+const Activity = lazy(() => import('./pages/Activity').then((m) => ({ default: m.Activity })));
+const AI = lazy(() => import('./pages/AI').then((m) => ({ default: m.AI })));
+const Progress = lazy(() => import('./pages/Progress').then((m) => ({ default: m.Progress })));
+const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
+const Pantry = lazy(() => import('./pages/Pantry').then((m) => ({ default: m.Pantry })));
 
 function Login({ onDone }: { onDone: () => void }) {
   const [error, setError] = useState('');
@@ -80,6 +83,7 @@ export function App() {
         <button onClick={toggleTheme} className="rounded-lg px-3 py-1 text-slate-500" aria-label="Cambiar tema claro/oscuro">🌓</button>
         <button onClick={async () => { await logout(); setState('out'); }} className="rounded-lg px-3 py-1 text-slate-500">Salir</button>
       </header>
+      <Suspense fallback={<p className="text-slate-500" role="status">Cargando…</p>}>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/food" element={<Food />} />
@@ -87,7 +91,9 @@ export function App() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/progress" element={<Progress />} />
         <Route path="/ai" element={<AI />} />
+        <Route path="/pantry" element={<Pantry />} />
       </Routes>
+      </Suspense>
       <nav className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-slate-800 dark:bg-[#0b0f14]/90">
         <ul className="mx-auto flex max-w-2xl">
           {tabs.map((t) => (

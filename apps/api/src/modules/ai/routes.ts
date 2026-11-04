@@ -20,6 +20,7 @@ export const aiRoutes: FastifyPluginAsync = async (app) => {
   app.addHook('onRequest', app.authenticate);
   const db = app.prisma;
   const deps = (userId: string): AIDeps => ({ db, env: app.env, fetchImpl: app.fetchImpl, userId });
+  const pantryNames = async (userId: string) => (await db.pantryItem.findMany({ where: { userId }, select: { name: true }, orderBy: { name: 'asc' } })).map((p) => p.name);
   const blockedOf = async (userId: string) => {
     const p = await db.userProfile.findUniqueOrThrow({ where: { userId } });
     return { allergies: p.allergies, disliked: p.dislikedFoods, blocked: [...p.allergies, ...p.dislikedFoods], sex: p.sex, targetKcal: p.targetKcal };
@@ -89,10 +90,11 @@ export const aiRoutes: FastifyPluginAsync = async (app) => {
   app.post('/recommend', async (req) => {
     const b = recommendRequest.parse(req.body);
     const userId = req.user.sub;
-    const [ctx, who] = await Promise.all([buildContext(db, userId, b.date, 7), blockedOf(userId)]);
+    const [ctx, who, pantry] = await Promise.all([buildContext(db, userId, b.date, 7), blockedOf(userId), pantryNames(userId)]);
+    const available = b.available?.length ? b.available : pantry; // sin indicar nada, se usa la despensa
     const rem = ctx.hoy.restante as Record<string, number>;
-    const key = cacheKey('rec', Math.round((rem.kcal ?? 0) / 50), Math.round((rem.protein ?? 0) / 10), b.category, b.budgetEur, [...(b.available ?? [])].sort(), who.blocked);
-    const user = wrap('datos_usuario', { ...ctx, petición: { categoria: b.category ?? 'cualquiera', presupuestoEur: b.budgetEur ?? null, alimentosDisponibles: b.available ?? [] } });
+    const key = cacheKey('rec', Math.round((rem.kcal ?? 0) / 50), Math.round((rem.protein ?? 0) / 10), b.category, b.budgetEur, [...available].sort(), who.blocked);
+    const user = wrap('datos_usuario', { ...ctx, petición: { categoria: b.category ?? 'cualquiera', presupuestoEur: b.budgetEur ?? null, alimentosDisponibles: available } });
     const { data, cached } = await runJson(deps(userId), 'NUTRITIONIST', { prompt: RECOMMEND_PROMPT, user, schema: aiRecommend, maxTokens: 3500, cache: { key, ttlMin: 180 } });
     // Defensa propia: nunca se muestra una opción con ingredientes bloqueados, diga lo que diga el modelo.
     const safe = data.options.filter((o) => findViolations(o.ingredients.map((i) => i.name), who.blocked).length === 0);
@@ -121,8 +123,8 @@ export const aiRoutes: FastifyPluginAsync = async (app) => {
     const b = menuRequest.parse(req.body ?? {});
     const userId = req.user.sub;
     const date = new Date().toISOString().slice(0, 10);
-    const [ctx, who] = await Promise.all([buildContext(db, userId, date, 7), blockedOf(userId)]);
-    const base = { objetivosDiarios: ctx.objetivosDiarios, perfil: { sexo: ctx.perfil.sexo }, alergiasIntolerancias: who.allergies, alimentosRechazados: who.disliked, presupuestoSemanalEur: b.budgetEur ?? null, alimentosDisponibles: b.available ?? [] };
+    const [ctx, who, pantry] = await Promise.all([buildContext(db, userId, date, 7), blockedOf(userId), pantryNames(userId)]);
+    const base = { objetivosDiarios: ctx.objetivosDiarios, perfil: { sexo: ctx.perfil.sexo }, alergiasIntolerancias: who.allergies, alimentosRechazados: who.disliked, presupuestoSemanalEur: b.budgetEur ?? null, alimentosDisponibles: b.available?.length ? b.available : pantry };
     const d = deps(userId);
     let { data } = await runJson(d, 'NUTRITIONIST', { prompt: MENU_PROMPT, user: wrap('datos_usuario', base), schema: aiMenu, maxTokens: 7000, cache: { key: cacheKey('menu', base), ttlMin: 60 } });
     let check = checkMenu(data, who);

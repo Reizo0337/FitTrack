@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { AIProvider, AITask, PrismaClient } from '@prisma/client';
-import type { ZodType, ZodTypeDef } from 'zod';
+import type { ZodType } from 'zod';
 import type { Env } from '../env';
 import { toDbDate } from '../lib/dates';
 import { decryptSecret } from '../security';
@@ -63,7 +63,7 @@ export function extractJson(text: string): unknown {
 export const cacheKey = (...parts: unknown[]) => createHash('sha256').update(JSON.stringify(parts)).digest('hex');
 
 /** Llamada con salida JSON validada (1 reintento de reparación) y caché opcional. */
-export async function runJson<T>(d: AIDeps, task: AITask, o: { prompt: string; user: string; schema: ZodType<T, ZodTypeDef, unknown>; maxTokens?: number; cache?: { key: string; ttlMin: number } }): Promise<{ data: T; cached: boolean }> {
+export async function runJson<T>(d: AIDeps, task: AITask, o: { prompt: string; user: string; schema: ZodType<T, unknown>; maxTokens?: number; cache?: { key: string; ttlMin: number } }): Promise<{ data: T; cached: boolean }> {
   const g = await guard(d, task);
   if (o.cache) {
     const hit = await d.db.aICache.findUnique({ where: { userId_key: { userId: d.userId, key: o.cache.key } } });
@@ -85,7 +85,7 @@ export async function runJson<T>(d: AIDeps, task: AITask, o: { prompt: string; u
   return { data: parsed.data, cached: false };
 }
 
-function tryParse<T>(text: string, schema: ZodType<T, ZodTypeDef, unknown>): { ok: true; data: T } | { ok: false; error: string } {
+function tryParse<T>(text: string, schema: ZodType<T, unknown>): { ok: true; data: T } | { ok: false; error: string } {
   try {
     const r = schema.safeParse(extractJson(text));
     return r.success ? { ok: true, data: r.data } : { ok: false, error: r.error.issues.slice(0, 3).map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') };

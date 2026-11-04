@@ -17,6 +17,13 @@ import { activityRoutes } from './modules/activity/routes';
 import { healthRoutes } from './modules/health/routes';
 import { reminderRoutes } from './modules/reminders/routes';
 import { aiRoutes } from './modules/ai/routes';
+import { accountRoutes } from './modules/account/routes';
+import { goalRoutes } from './modules/goals/routes';
+import { pantryRoutes } from './modules/pantry/routes';
+import { photoRoutes } from './modules/photos/routes';
+import fastifyStatic from '@fastify/static';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { insightRoutes } from './modules/insights/routes';
 import { AIError } from './ai/service';
 
@@ -40,6 +47,7 @@ export async function buildApp(env: Env, prisma: PrismaClient, deps: { fetch?: t
   const app = Fastify({
     logger: env.NODE_ENV === 'test' ? false : { level: 'info', redact: ['req.headers.authorization', 'req.headers.cookie'] },
     bodyLimit: 1_000_000,
+    trustProxy: env.NODE_ENV === 'production', // detrás del proxy del hosting: IP real para los límites de peticiones
   });
 
   app.decorate('prisma', prisma);
@@ -47,14 +55,32 @@ export async function buildApp(env: Env, prisma: PrismaClient, deps: { fetch?: t
   app.decorate('fetchImpl', deps.fetch ?? fetch);
   app.decorate('pushSender', deps.pushSender);
 
-  await app.register(helmet);
+  // CSP estricta. Tesseract.js (OCR local) necesita su worker (blob) y descarga el motor/idioma desde un CDN público.
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'wasm-unsafe-eval'", 'blob:', 'https://cdn.jsdelivr.net'],
+        workerSrc: ["'self'", 'blob:'],
+        connectSrc: ["'self'", 'https://cdn.jsdelivr.net', 'https://tessdata.projectnaptha.com'],
+        imgSrc: ["'self'", 'data:', 'blob:'],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        mediaSrc: ["'self'", 'blob:'],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
+    },
+  });
   await app.register(cors, {
     origin: env.CORS_ORIGINS.split(',').map((s) => s.trim()),
     credentials: true,
   });
   await app.register(cookie);
   await app.register(jwt, { secret: env.JWT_SECRET, sign: { expiresIn: '15m' } });
-  await app.register(rateLimit, { global: false });
+  const globalMax = env.RATE_LIMIT_MAX ?? (env.NODE_ENV === 'test' ? 0 : 300);
+  await app.register(rateLimit, globalMax ? { global: true, max: globalMax, timeWindow: '1 minute' } : { global: false });
 
   app.decorate('authenticate', async (req: FastifyRequest, reply: FastifyReply) => {
     try {
@@ -85,6 +111,20 @@ export async function buildApp(env: Env, prisma: PrismaClient, deps: { fetch?: t
   await app.register(reminderRoutes, { prefix: '/api' });
   await app.register(aiRoutes, { prefix: '/api/ai' });
   await app.register(insightRoutes, { prefix: '/api/insights' });
+  await app.register(accountRoutes, { prefix: '/api/account' });
+  await app.register(photoRoutes, { prefix: '/api/photos' });
+  await app.register(goalRoutes, { prefix: '/api/goals' });
+  await app.register(pantryRoutes, { prefix: '/api/pantry' });
+
+  // Web compilada servida desde el mismo origen (necesario para cookies fiables en iOS/Safari y sin CORS).
+  const staticDir = env.STATIC_DIR ? resolve(env.STATIC_DIR) : null;
+  if (staticDir && existsSync(resolve(staticDir, 'index.html'))) {
+    await app.register(fastifyStatic, { root: staticDir, wildcard: false, index: false, setHeaders: (res, path) => { res.header('cache-control', path.replace(/\\/g, '/').includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache'); } });
+    app.setNotFoundHandler((req, reply) => {
+      if (req.method === 'GET' && !req.url.startsWith('/api/')) return reply.header('cache-control', 'no-cache').sendFile('index.html');
+      return reply.code(404).send({ error: 'NOT_FOUND' });
+    });
+  }
 
   return app;
 }

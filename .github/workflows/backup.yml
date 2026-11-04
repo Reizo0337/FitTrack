@@ -1,0 +1,27 @@
+# Copia de seguridad diaria de la base de datos (pg_dump -> gzip -> cifrada con contraseña) como artefacto privado (30 días).
+# Secretos en GitHub -> Settings -> Secrets: BACKUP_DATABASE_URL (conexión de Neon) y BACKUP_PASSPHRASE (guárdala fuera de GitHub).
+# Contiene datos de salud y fotos: usa un repositorio PRIVADO. Restauración: docs/DEPLOY.md.
+name: backup
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Volcar y cifrar
+        env:
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          docker run --rm postgres:17 pg_dump --no-owner --no-privileges "$DATABASE_URL" | gzip -9 \
+            | gpg --batch --yes --pinentry-mode loopback --symmetric --cipher-algo AES256 --passphrase "$PASSPHRASE" -o "fittrack-$(date +%F).sql.gz.gpg"
+          ls -lh fittrack-*.gpg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fittrack-backup
+          path: fittrack-*.sql.gz.gpg
+          retention-days: 30

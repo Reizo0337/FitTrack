@@ -16,13 +16,19 @@ const schema = z.object({
   /** Secreto para que un cron externo llame a /api/internal/tick (opcional, >= 24 caracteres). */
   CRON_SECRET: z.string().min(24).optional(),
   /** Límite diario de llamadas a modelos de IA (control de costes). */
+  /** Carpeta con la web compilada (apps/web/dist) para servirla desde el mismo origen. */
+  STATIC_DIR: z.string().optional(),
+  /** Peticiones por minuto y IP (global). En tests se desactiva salvo que se indique. */
+  RATE_LIMIT_MAX: z.coerce.number().int().min(10).optional(),
   AI_DAILY_LIMIT: z.coerce.number().int().min(1).max(1000).default(60),
 });
 
 export type Env = z.infer<typeof schema>;
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
-  const parsed = schema.safeParse(source);
+  // Las variables vacías (p. ej. copiadas de .env.example) cuentan como no definidas.
+  const clean = Object.fromEntries(Object.entries(source).filter(([, v]) => v !== ''));
+  const parsed = schema.safeParse(clean);
   if (!parsed.success) {
     throw new Error('Configuración inválida:\n' + parsed.error.issues.map((i) => `- ${i.path.join('.')}: ${i.message}`).join('\n'));
   }

@@ -45,3 +45,15 @@ export async function logout() {
   await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
   accessToken = null;
 }
+
+/** Descarga un archivo autenticado (p. ej. la exportación de datos). */
+export async function download(path: string, filename: string) {
+  const send = () => fetch(`/api${path}`, { credentials: 'include', headers: accessToken ? { authorization: `Bearer ${accessToken}` } : {} });
+  let r = await send();
+  if (r.status === 401 && (await refresh())) r = await send();
+  if (!r.ok) throw new ApiError(r.status, 'DOWNLOAD_FAILED');
+  const url = URL.createObjectURL(await r.blob());
+  const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}

@@ -76,6 +76,7 @@ model User {
   aiUsage      AIUsage[]
   aiCache      AICache[]
   menus        WeeklyMenu[]
+  pantry       PantryItem[]
   healthSync   HealthSyncRecord[]
 }
 
@@ -158,7 +159,9 @@ model ProgressPhoto {
   id        String   @id @default(cuid())
   userId    String
   takenAt   DateTime @db.Timestamptz
-  storageKey String  // ruta privada; se sirve con URL firmada de corta duración
+  mime      String
+  bytes     Int
+  data      Bytes   // imagen guardada en la BD (privada; se sirve con URL firmada de corta duración)
   note      String?
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -385,6 +388,7 @@ model Goal {
   period    String   @default("DAY") // DAY | WEEK
   active    Boolean  @default(true)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, kind])
 }
 
 model AIProviderConfig {
@@ -473,4 +477,13 @@ model WeeklyMenu {
   warnings  String[]
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId, createdAt])
+}
+model PantryItem {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  norm      String
+  createdAt DateTime @default(now()) @db.Timestamptz
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, norm])
 }

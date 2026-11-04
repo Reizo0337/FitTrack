@@ -11,11 +11,18 @@ const dummyHashPromise = hashPassword('dummy-password-for-timing');
 export const authRoutes: FastifyPluginAsync = async (app) => {
   const cookieOpts = {
     httpOnly: true,
-    sameSite: (app.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax',
+    sameSite: 'lax' as const, // la web se sirve desde el mismo origen: Lax basta y protege frente a CSRF
     secure: app.env.NODE_ENV === 'production',
     path: '/api/auth',
     maxAge: REFRESH_DAYS * 86400,
   };
+
+  // Defensa CSRF adicional: si el navegador envía Origin, debe ser el propio servidor o un origen permitido.
+  const allowed = app.env.CORS_ORIGINS.split(',').map((s) => s.trim());
+  app.addHook('onRequest', async (req, reply) => {
+    const origin = req.headers.origin;
+    if (req.method === 'POST' && origin && !allowed.includes(origin) && new URL(origin).host !== req.headers.host) return reply.code(403).send({ error: 'BAD_ORIGIN' });
+  });
 
   async function issueSession(userId: string, reply: import('fastify').FastifyReply) {
     const token = randomToken();

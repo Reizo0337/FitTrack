@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
+import { Challenges } from '../components/Challenges';
 import { Chart } from '../components/Chart';
+import { Photos } from '../components/Photos';
 import { shiftDate, todayStr, useApp } from '../ctx';
 
 type Pt = { date: string; weightKg: number; avg7: number; bodyFatPct: number | null; muscleKg: number | null; bodyWaterPct: number | null };
@@ -37,19 +39,19 @@ export function Progress() {
 
   async function addWeight(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
+    const form = e.currentTarget; const f = new FormData(form);
     const n = (k: string) => (f.get(k) ? Number(String(f.get(k)).replace(',', '.')) : undefined);
     try {
       await api('/weight', { method: 'POST', body: JSON.stringify({ date: String(f.get('date')), weightKg: n('weightKg'), bodyFatPct: n('bodyFatPct'), muscleKg: n('muscleKg'), bodyWaterPct: n('bodyWaterPct') }) });
-      e.currentTarget.reset(); setMsg('Peso guardado.'); bump();
+      form.reset(); setMsg('Peso guardado.'); bump();
     } catch (er) { setMsg(er instanceof ApiError && er.status === 400 ? 'Revisa los valores (peso 30-400 kg, grasa 2-70 %…).' : 'Error al guardar.'); }
   }
   async function addMeas(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
+    const form = e.currentTarget; const f = new FormData(form);
     const body: Record<string, unknown> = { date: String(f.get('date')) };
     for (const [k] of M) if (f.get(k as string)) body[k as string] = Number(String(f.get(k as string)).replace(',', '.'));
-    try { await api('/weight/measurements', { method: 'POST', body: JSON.stringify(body) }); e.currentTarget.reset(); setMsg('Medidas guardadas.'); bump(); }
+    try { await api('/weight/measurements', { method: 'POST', body: JSON.stringify(body) }); form.reset(); setMsg('Medidas guardadas.'); bump(); }
     catch { setMsg('Indica al menos una medida válida.'); }
   }
 
@@ -83,6 +85,8 @@ export function Progress() {
         {stats && hasFat && <p className="mt-3 text-xs text-slate-500">Última composición: grasa {series.filter((p) => p.bodyFatPct != null).at(-1)?.bodyFatPct} %{series.some((p) => p.muscleKg != null) ? ` · músculo ${series.filter((p) => p.muscleKg != null).at(-1)?.muscleKg} kg` : ''}.</p>}
       </section>
 
+      <Challenges />
+
       <form onSubmit={addWeight} className="card flex flex-col gap-2">
         <h2 className="font-semibold">Registrar peso</h2>
         <div className="grid grid-cols-2 gap-2">
@@ -107,6 +111,7 @@ export function Progress() {
           <button className="btn col-span-2">Guardar medidas</button>
         </form>
       </section>
+      <Photos />
     </div>
   );
 }

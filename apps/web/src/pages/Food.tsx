@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { MEAL_LABELS, type MealTypeId, type Nutrients } from '@fittrack/shared';
+import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { Bar } from '../components/Chart';
 import { shiftDate, todayStr, useApp } from '../ctx';
@@ -52,6 +53,8 @@ export function Food() {
           <Bar label="Fibra" value={d.totals.fiber} target={d.targets.fiber} color="#a78bfa" />
         </div>
       </section>
+
+      <Link to="/pantry" className="text-sm text-accent">🧺 Despensa y lista de la compra ›</Link>
 
       {d.productAlerts.map((a) => (
         <div key={a.productId} role="note" className={`rounded-xl border-l-4 p-3 text-sm ${a.level === 'warn' ? 'border-amber-500 bg-amber-500/10' : 'border-sky-500 bg-sky-500/10'}`}>

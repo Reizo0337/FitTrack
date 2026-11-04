@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api';
+import { Challenges } from '../components/Challenges';
 import { Bar, Chart, Ring } from '../components/Chart';
 import { todayStr, useApp } from '../ctx';
 import type { Diary } from './Food';
@@ -74,6 +75,8 @@ export function Home() {
       </section>
 
       {y.productAlerts.filter((a) => a.level === 'warn').map((a) => <p key={a.productId} role="alert" className="rounded-xl bg-amber-500/10 p-3 text-sm">{a.messages[0]}</p>)}
+
+      <Challenges compact />
 
       <section className="card">
         <h2 className="mb-2 font-semibold">Agua</h2>

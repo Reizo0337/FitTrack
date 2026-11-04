@@ -12,6 +12,11 @@ export function AddFood({ init, onClose }: { init: Init; onClose: () => void }) 
   const [type, setType] = useState<MealTypeId>(init.type ?? defaultMeal());
   const [item, setItem] = useState<FoodItem | null>(null);
   const [prefill, setPrefill] = useState<{ barcode?: string; msg?: string }>({});
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   return (
     <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/60" role="dialog" aria-modal="true" aria-label="Añadir alimento">

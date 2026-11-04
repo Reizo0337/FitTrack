@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { api, ApiError } from '../api';
+import { api, ApiError, download } from '../api';
 
 type Profile = { goalWeightKg: number; activityLevel: string; timezone: string; targetKcal: number; targetProteinG: number; targetFatG: number; targetFiberG: number; targetWaterMl: number; allergies: string[]; dislikedFoods: string[]; aiConsent: boolean };
 type Reminder = { kind: string; enabled: boolean; timeLocal: string; weekdays: number[] };
@@ -28,6 +28,7 @@ export function Settings() {
       <AiSettings say={setMsg} />
       <Health say={setMsg} />
       <Notifications say={setMsg} />
+      <Account say={setMsg} />
     </div>
   );
 }
@@ -39,7 +40,7 @@ function Goals({ say }: { say: (m: string) => void }) {
   if (!p) return null;
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
+    const form = e.currentTarget; const f = new FormData(form);
     const n = (k: string) => Number(String(f.get(k)).replace(',', '.'));
     const list = (k: string) => String(f.get(k) || '').split(',').map((s) => s.trim()).filter(Boolean);
     try {
@@ -83,14 +84,14 @@ function AiSettings({ say }: { say: (m: string) => void }) {
   if (!c) return null;
   async function saveKey(e: FormEvent<HTMLFormElement>, provider: string) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    try { await api('/ai/keys', { method: 'PUT', body: JSON.stringify({ provider, apiKey: String(f.get('key')) }) }); e.currentTarget.reset(); say(`Clave de ${PROV_LABEL[provider]} guardada (cifrada en el servidor).`); load(); }
+    const form = e.currentTarget; const f = new FormData(form);
+    try { await api('/ai/keys', { method: 'PUT', body: JSON.stringify({ provider, apiKey: String(f.get('key')) }) }); form.reset(); say(`Clave de ${PROV_LABEL[provider]} guardada (cifrada en el servidor).`); load(); }
     catch { say('Clave no válida.'); }
   }
   async function delKey(provider: string) { await api(`/ai/keys/${provider}`, { method: 'DELETE' }); say('Clave eliminada.'); load(); }
   async function saveTasks(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
+    const form = e.currentTarget; const f = new FormData(form);
     const items = c!.tasks.map((t) => ({ task: t.task, provider: String(f.get(`p-${t.task}`)), model: String(f.get(`m-${t.task}`)).trim() }));
     try { await api('/ai/config', { method: 'PUT', body: JSON.stringify({ items }) }); say('Modelos guardados.'); load(); } catch { say('Nombre de modelo no válido.'); }
   }
@@ -118,6 +119,52 @@ function AiSettings({ say }: { say: (m: string) => void }) {
   );
 }
 
+function Account({ say }: { say: (m: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  async function exportData(photos: boolean) {
+    setBusy(true);
+    try { await download(`/account/export${photos ? '?photos=1' : ''}`, `fittrack-export-${new Date().toISOString().slice(0, 10)}.json`); say('Exportación descargada.'); }
+    catch { say('No se pudo exportar.'); } finally { setBusy(false); }
+  }
+  async function changePassword(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget; const f = new FormData(form);
+    try { await api('/account/password', { method: 'POST', body: JSON.stringify({ current: String(f.get('current')), next: String(f.get('next')) }) }); form.reset(); say('Contraseña cambiada. Las demás sesiones se han cerrado.'); }
+    catch (er) { say(er instanceof ApiError && er.status === 403 ? 'La contraseña actual no es correcta.' : 'La nueva contraseña debe tener al menos 12 caracteres.'); }
+  }
+  async function wipe(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget; const f = new FormData(form);
+    if (!confirm('Esto borra TODOS tus datos de forma definitiva (comidas, peso, fotos, claves…). ¿Continuar?')) return;
+    try { await api('/account', { method: 'DELETE', body: JSON.stringify({ password: String(f.get('password')), confirm: String(f.get('confirm')) }) }); location.href = '/'; }
+    catch (er) { say(er instanceof ApiError && er.status === 403 ? 'Contraseña incorrecta.' : 'Escribe exactamente BORRAR TODO para confirmar.'); }
+  }
+  return (
+    <section className="card flex flex-col gap-3">
+      <h2 className="font-semibold">Privacidad y cuenta</h2>
+      <p className="text-xs text-slate-500">Tus datos son tuyos: puedes llevártelos o borrarlos por completo en cualquier momento.</p>
+      <div className="flex gap-2">
+        <button className="flex-1 rounded-xl border border-slate-300 py-2 text-sm dark:border-slate-700" disabled={busy} onClick={() => exportData(false)}>Exportar datos (JSON)</button>
+        <button className="flex-1 rounded-xl border border-slate-300 py-2 text-sm dark:border-slate-700" disabled={busy} onClick={() => exportData(true)}>Exportar con fotos</button>
+      </div>
+      <p className="text-xs text-slate-500">La exportación no incluye contraseñas, tokens ni claves API.</p>
+      <form onSubmit={changePassword} className="flex flex-col gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
+        <h3 className="text-sm font-semibold">Cambiar contraseña</h3>
+        <input name="current" type="password" autoComplete="current-password" className="input" placeholder="Contraseña actual" required />
+        <input name="next" type="password" autoComplete="new-password" className="input" placeholder="Nueva contraseña (mín. 12 caracteres)" minLength={12} required />
+        <button className="btn">Cambiar contraseña</button>
+      </form>
+      <form onSubmit={wipe} className="flex flex-col gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
+        <h3 className="text-sm font-semibold text-red-500">Borrar todos mis datos</h3>
+        <p className="text-xs text-slate-500">Elimina tu cuenta y todo lo asociado. No se puede deshacer. Exporta antes si quieres conservar una copia.</p>
+        <input name="password" type="password" autoComplete="current-password" className="input" placeholder="Tu contraseña" required />
+        <input name="confirm" className="input" placeholder="Escribe BORRAR TODO" required autoComplete="off" />
+        <button className="rounded-xl border border-red-500 py-3 font-semibold text-red-500">Borrar definitivamente</button>
+      </form>
+    </section>
+  );
+}
+
 function Health({ say }: { say: (m: string) => void }) {
   const [toks, setToks] = useState<Tok[]>([]);
   const [fresh, setFresh] = useState('');
@@ -125,9 +172,9 @@ function Health({ say }: { say: (m: string) => void }) {
   useEffect(() => { load(); }, [load]);
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const label = String(new FormData(e.currentTarget).get('label'));
+    const form = e.currentTarget; const label = String(new FormData(form).get('label'));
     const r = await api<{ token: string }>('/health/tokens', { method: 'POST', body: JSON.stringify({ label }) });
-    setFresh(r.token); e.currentTarget.reset(); load();
+    setFresh(r.token); form.reset(); load();
   }
   async function revoke(id: string) { await api(`/health/tokens/${id}`, { method: 'DELETE' }); load(); say('Token revocado.'); }
   const url = `${location.origin}/api/health/ingest`;

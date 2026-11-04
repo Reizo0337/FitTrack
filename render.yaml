@@ -1,0 +1,26 @@
+# Blueprint de Render (plan gratuito). La base de datos va en Neon (ver docs/DEPLOY.md); NO uses el Postgres gratuito de Render (caduca a los 30 días).
+services:
+  - type: web
+    name: fittrack
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL        # cadena de conexión de Neon (con ?sslmode=require)
+        sync: false
+      - key: MASTER_KEY          # 64 caracteres hex: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS        # tu URL pública, p. ej. https://fittrack.onrender.com
+        sync: false
+      - key: CRON_SECRET
+        generateValue: true
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: mailto:tu@email.com
+      - key: AI_DAILY_LIMIT
+        value: "60"
