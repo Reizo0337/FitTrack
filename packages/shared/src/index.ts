@@ -7,4 +7,5 @@ export * from './stats';
 export * from './insights';
 export * from './goals';
 export * from './fasting';
+export * from './generic';
 export * from './intent';

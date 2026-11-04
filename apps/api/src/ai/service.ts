@@ -28,8 +28,6 @@ async function guard(d: AIDeps, task: AITask) {
   const { provider, model } = await getTaskConfig(d.db, d.userId, task);
   const k = await d.db.aIProviderKey.findUnique({ where: { userId_provider: { userId: d.userId, provider } } });
   if (!k) throw new AIError(409, 'AI_KEY_MISSING', `Falta la clave API de ${provider} (Ajustes → IA).`);
-  const used = await d.db.aIUsage.aggregate({ where: { userId: d.userId, day: today() }, _sum: { calls: true } });
-  if ((used._sum.calls ?? 0) >= d.env.AI_DAILY_LIMIT) throw new AIError(429, 'AI_DAILY_LIMIT', 'Has alcanzado el límite diario de llamadas a la IA.');
   return { provider, model, apiKey: decryptSecret(k.encryptedKey, d.env.MASTER_KEY) };
 }
 

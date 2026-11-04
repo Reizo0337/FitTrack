@@ -49,7 +49,7 @@ export function Home() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-start">
         <div className="flex flex-col gap-4">
-          <CalorieSummary d={d} />
+          <CalorieSummary d={d} burned={dash.data.activity?.activeKcal} />
           <FastingCard />
           {d.productAlerts.filter((a) => a.level === 'warn').map((a) => <Notice key={a.productId} tone="warn">{a.messages[0]}</Notice>)}
           {trend.data && trend.data.trend.status !== 'insufficient_data' && <Notice tone={['stalled', 'too_fast', 'gaining'].includes(trend.data.trend.status) ? 'warn' : 'accent'}>{trend.data.trend.message}</Notice>}

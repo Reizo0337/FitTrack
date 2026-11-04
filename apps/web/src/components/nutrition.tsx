@@ -1,6 +1,6 @@
 import { MEAL_LABELS } from '@fittrack/shared';
 import { Coffee, Moon, Plus, Soup, Sun, Trash2, Repeat, type LucideIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Diary, Entry, MealDay } from '../types';
 import { Badge, Card, IconButton, cx } from '../ui/primitives';
 import { MacroIndicator, ProgressRing } from '../ui/progress';
@@ -9,22 +9,40 @@ const MEAL_ICON: Record<string, LucideIcon> = { BREAKFAST: Coffee, LUNCH: Sun, D
 const kcal = (n: number) => Math.round(n).toLocaleString('es');
 
 /** Calorías del día: anillo + macros. Es el resumen central de Inicio y Alimentación. */
-export function CalorieSummary({ d, compact }: { d: Diary; compact?: boolean }) {
-  const left = Math.round(d.remaining.kcal ?? 0);
+export function CalorieSummary({ d, compact, burned }: { d: Diary; compact?: boolean; burned?: number | null }) {
+  const canShow = burned != null && burned > 0;
+  // Preferencia guardada: al tocar la rueda se ve (en gris) lo que restaría el ejercicio.
+  const [withEx, setWithEx] = useState(() => { try { return localStorage.getItem('ring-exercise') === '1'; } catch { return false; } });
+  const on = canShow && withEx;
+  const sub = on ? Math.min(burned!, d.totals.kcal) : 0;
+  const left = Math.round((d.remaining.kcal ?? 0) + (on ? burned! : 0));
   const over = left < 0;
+  const toggle = () => setWithEx((v) => { const n = !v; try { localStorage.setItem('ring-exercise', n ? '1' : '0'); } catch { /* sin almacenamiento */ } return n; });
+  const ring = (
+    <ProgressRing value={d.totals.kcal / d.targets.kcal} deducted={sub / d.targets.kcal} size={compact ? 104 : 118} tone={over ? 'warn' : 'accent'} label="Calorías del día">
+      <span className="num t-title leading-none">{kcal(Math.abs(left))}</span>
+      <span className="t-meta mt-1 text-[0.6875rem]">{over ? 'kcal de más' : on ? 'restantes con ejercicio' : 'kcal restantes'}</span>
+    </ProgressRing>
+  );
   return (
     <Card>
       <div className="flex items-center gap-4 sm:gap-5">
-        <ProgressRing value={d.totals.kcal / d.targets.kcal} size={compact ? 104 : 118} tone={over ? 'warn' : 'accent'} label="Calorías del día">
-          <span className="num t-title leading-none">{kcal(Math.abs(left))}</span>
-          <span className="t-meta mt-1 text-[0.6875rem]">{over ? 'kcal de más' : 'kcal restantes'}</span>
-        </ProgressRing>
+        {canShow
+          ? <button type="button" onClick={toggle} aria-pressed={on} aria-label={on ? 'Ocultar el ejercicio en la rueda' : 'Mostrar el ejercicio en la rueda'} className="shrink-0 rounded-full transition active:scale-[.98]">{ring}</button>
+          : ring}
         <dl className="grid min-w-0 flex-1 grid-cols-2 gap-y-3">
           <div><dt className="t-meta">Consumidas</dt><dd className="num t-head">{kcal(d.totals.kcal)}</dd></div>
           <div><dt className="t-meta">Objetivo</dt><dd className="num t-head">{kcal(d.targets.kcal)}</dd></div>
           <div className="col-span-2"><dt className="t-meta">Proteína pendiente</dt><dd className="num t-head">{Math.max(0, Math.round(d.remaining.protein ?? 0))} g</dd></div>
         </dl>
       </div>
+      {canShow && (
+        <p className="t-meta mt-3">
+          {on
+            ? <><i className="mr-1.5 inline-block size-2 rounded-full bg-ink-3 opacity-60 align-baseline" aria-hidden />Gris: {kcal(burned!)} kcal de ejercicio que se restarían. Los relojes suelen sobrestimar; úsalo como referencia, no como permiso para comer más.</>
+            : <>Hoy has quemado {kcal(burned!)} kcal con ejercicio. Toca la rueda para verlo restado.</>}
+        </p>
+      )}
       <div className="mt-5 flex gap-2.5 sm:gap-4 border-t border-line pt-4">
         <MacroIndicator name="Proteínas" value={d.totals.protein} target={d.targets.protein} tone="protein" />
         <MacroIndicator name="Carbohidratos" value={d.totals.carbs} target={d.targets.carbs} tone="carbs" />

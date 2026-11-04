@@ -33,7 +33,6 @@ El proyecto ya está enlazado con `neon init` (fichero `neon.ts`, rama `producti
 | `JWT_SECRET`, `CRON_SECRET` | generadas por Render |
 | `CORS_ORIGINS` | tu URL pública (`https://….onrender.com`) |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | `npx web-push generate-vapid-keys` |
-| `AI_DAILY_LIMIT` | límite diario de llamadas a IA |
 
 3. Las migraciones se aplican solas al arrancar (`prisma migrate deploy`).
 4. **Crear tu usuario** (no hay registro público ni shell en el plan gratuito): en tu PC, con `DATABASE_URL` de Neon en `apps/api/.env`, ejecuta `npm run create-user -- tu@email.com "contraseña-larga"`.

@@ -121,3 +121,24 @@ export const aiPantryScan = z.object({
   notes: z.string().max(500).nullish(),
 });
 export const pantryBulkSchema = z.object({ names: z.array(z.string().trim().min(2).max(60)).min(1).max(60) });
+
+/** Foto del plato: una sola imagen ya reducida en el cliente (base64, sin prefijo data:). */
+const plateImage = z.object({ mime: z.enum(['image/jpeg', 'image/png', 'image/webp']), data: z.string().min(100).max(2_500_000) });
+export const plateInspectRequest = z.object({ image: plateImage });
+export const plateAnalyzeRequest = z.object({
+  image: plateImage,
+  answers: z.array(z.object({ question: z.string().trim().max(200), answer: z.string().trim().min(1).max(200) })).max(5).default([]),
+});
+/** Paso 1: ¿es comida? + preguntas aclaratorias. `isFood` es obligatorio: sin él la respuesta se rechaza. */
+export const aiPlateInspect = z.object({
+  isFood: z.boolean(),
+  reason: z.string().max(300).nullish(),
+  dish: z.string().max(160).nullish(),
+  questions: z.array(z.object({ id: z.string().max(30), question: z.string().min(3).max(200), options: z.array(z.string().min(1).max(60)).min(2).max(5) })).max(3).default([]),
+});
+export const aiPlateAnalyze = z.object({
+  isFood: z.boolean(),
+  reason: z.string().max(300).nullish(),
+  items: z.array(aiFoodItem).max(25).default([]),
+  notes: z.string().max(500).nullish(),
+});

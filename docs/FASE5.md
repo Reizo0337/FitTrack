@@ -18,7 +18,7 @@
 | Estancamiento | `GET /api/insights/status` (sin IA) | Compara medias semanales de peso (≥ 3 pesajes/semana, ≥ 2 semanas); no propone recortar calorías automáticamente. |
 
 ## Control de costes
-Caché de respuestas idénticas (recomendaciones 3 h, menús 1 h, análisis semanal 24 h), límite diario `AI_DAILY_LIMIT` (60 por defecto), modelo más barato por defecto para el reconocimiento de comidas, y contador de uso visible en Ajustes.
+Caché de respuestas idénticas (recomendaciones 3 h, menús 1 h, análisis semanal 24 h), modelo más barato por defecto para el reconocimiento de comidas, y contador de uso visible en Ajustes.
 
 ## Qué está verificado y qué no
 - Verificado con **proveedores simulados** (82 tests): formato de las peticiones a cada proveedor, cabeceras de clave, cambio de proveedor por tarea, reintento por salida inválida, límites, caché, consentimiento y filtrado de alergias.

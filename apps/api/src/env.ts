@@ -20,7 +20,6 @@ const schema = z.object({
   STATIC_DIR: z.string().optional(),
   /** Peticiones por minuto y IP (global). En tests se desactiva salvo que se indique. */
   RATE_LIMIT_MAX: z.coerce.number().int().min(10).optional(),
-  AI_DAILY_LIMIT: z.coerce.number().int().min(1).max(1000).default(60),
 });
 
 export type Env = z.infer<typeof schema>;

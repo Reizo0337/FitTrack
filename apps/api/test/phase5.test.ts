@@ -219,22 +219,16 @@ describe('menú semanal', () => {
 });
 
 describe('control de costes', () => {
-  it('respeta el límite diario de llamadas', async () => {
-    const lowEnv = loadEnv({ ...baseEnv, AI_DAILY_LIMIT: '2' } as NodeJS.ProcessEnv);
-    const app2 = await buildApp(lowEnv, prisma, { fetch: fake });
+  it('no impone límite diario de llamadas', async () => {
+    const app2 = await buildApp(loadEnv(baseEnv as NodeJS.ProcessEnv), prisma, { fetch: fake });
     await createUser(prisma, { email: 'limite@example.com', password: 'una-contraseña-larga-7' });
     const h = { authorization: `Bearer ${(await app2.inject({ method: 'POST', url: '/api/auth/login', payload: { email: 'limite@example.com', password: 'una-contraseña-larga-7' }, remoteAddress: '10.9.0.1' })).json().accessToken}` };
     await app2.inject({ method: 'PUT', url: '/api/profile', headers: h, payload: { aiConsent: true } });
     await app2.inject({ method: 'PUT', url: '/api/ai/keys', headers: h, payload: { provider: 'ANTHROPIC', apiKey: KEY } });
-    calls = []; replies = [JSON.stringify({ items: [item()] }), JSON.stringify({ items: [item()] })];
+    calls = []; replies = Array.from({ length: 4 }, () => JSON.stringify({ items: [item()] }));
     const go = () => app2.inject({ method: 'POST', url: '/api/ai/food/parse', headers: h, payload: { text: 'pollo asado', date: DAY } });
-    expect((await go()).statusCode).toBe(200);
-    expect((await go()).statusCode).toBe(200);
-    const third = await go();
-    expect(third.statusCode).toBe(429);
-    expect(third.json().error).toBe('AI_DAILY_LIMIT');
-    expect(calls).toHaveLength(2);
-    expect((await app2.inject({ method: 'GET', url: '/api/ai/config', headers: h })).json().usageToday).toMatchObject({ calls: 2, limit: 2 });
+    for (let i = 0; i < 4; i++) expect((await go()).statusCode).toBe(200);
+    expect(calls).toHaveLength(4);
     await app2.close();
   });
 });

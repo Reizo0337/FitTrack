@@ -3,10 +3,11 @@ import { Camera, ChevronLeft, ChevronRight, Search, Star } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
 import { defaultMeal, useApp } from '../ctx';
+import { PlateAI } from './PlateAI';
 import { Sheet, useToast } from '../ui/overlays';
 import { Button, FormField, Notice, SelectField, Segmented, Skeleton, haptic } from '../ui/primitives';
 
-type Tab = 'search' | 'scan' | 'create';
+type Tab = 'search' | 'scan' | 'photo' | 'create';
 type Init = { type?: MealTypeId; tab?: Tab };
 
 export function AddFood({ init, onClose }: { init: Init; onClose: () => void }) {
@@ -24,9 +25,10 @@ export function AddFood({ init, onClose }: { init: Init; onClose: () => void }) 
           onSaved={(name) => { haptic(12); toast(`${name} añadido a ${MEAL_LABELS[type].toLowerCase()}`); bump(); onClose(); }} />
       ) : (
         <div className="flex flex-col gap-3">
-          <Segmented<Tab> label="Método" value={tab} onChange={setTab} block options={[{ value: 'search', label: 'Buscar' }, { value: 'scan', label: 'Escanear' }, { value: 'create', label: 'Crear' }]} />
+          <Segmented<Tab> label="Método" value={tab} onChange={setTab} block options={[{ value: 'search', label: 'Buscar' }, { value: 'scan', label: 'Escanear' }, { value: 'photo', label: 'Foto IA' }, { value: 'create', label: 'Crear' }]} />
           {tab === 'search' && <FoodSearch onPick={setItem} />}
           {tab === 'scan' && <Scan onPick={setItem} onMissing={(barcode, msg) => { setPrefill({ barcode, msg }); setTab('create'); }} />}
+          {tab === 'photo' && <PlateAI date={date} type={type} onClose={onClose} />}
           {tab === 'create' && <Create prefill={prefill} onCreated={setItem} />}
         </div>
       )}
@@ -39,7 +41,7 @@ const Row = ({ i, onPick }: { i: FoodData; onPick: (i: FoodData) => void }) => (
     <button onClick={() => onPick(i)} className="flex min-h-14 w-full items-center gap-3 py-2 text-left">
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5 font-medium">{i.isFavorite && <Star className="size-3.5 shrink-0 fill-warn text-warn" aria-label="Favorito" />}<span className="truncate">{i.name}</span></span>
-        <span className="t-meta num block truncate">{i.brand ? `${i.brand} · ` : ''}{Math.round(i.per100.kcal)} kcal / 100 g · P {i.per100.protein} g</span>
+        <span className="t-meta num block truncate">{i.brand ? `${i.brand} · ` : i.source === 'GENERIC' ? 'Casero · ' : ''}{Math.round(i.per100.kcal)} kcal / 100 g · P {i.per100.protein} g</span>
       </span>
       <ChevronRight className="size-4 shrink-0 text-ink-3" aria-hidden />
     </button>
@@ -105,6 +107,14 @@ export function FoodSearch({ onPick }: { onPick: (i: FoodData) => void }) {
     </div>
   );
 }
+/** Comprueba el dígito de control de EAN-13/EAN-8/UPC-A para descartar lecturas erróneas de la cámara. */
+function validBarcode(c: string) {
+  if (c.length < 6 || c.length > 14) return false;
+  if (![8, 12, 13].includes(c.length)) return true; // otros formatos: sin checksum conocido
+  const d = c.split('').map(Number);
+  const sum = d.slice(0, -1).reduceRight((a, x, i, arr) => a + x * ((arr.length - i) % 2 === 1 ? 3 : 1), 0);
+  return (10 - (sum % 10)) % 10 === d[d.length - 1];
+}
 function Scan({ onPick, onMissing }: { onPick: (i: FoodData) => void; onMissing: (code: string, msg: string) => void }) {
   const video = useRef<HTMLVideoElement>(null);
   const [err, setErr] = useState('');
@@ -127,11 +137,36 @@ function Scan({ onPick, onMissing }: { onPick: (i: FoodData) => void; onMissing:
   useEffect(() => {
     let stop: (() => void) | undefined;
     let cancelled = false;
+    const onCode = (raw: string) => {
+      const code = raw.replace(/\D/g, '');
+      if (!cancelled && validBarcode(code)) lookup(code); // lectura con checksum inválido: se ignora y sigue escaneando
+    };
     (async () => {
       if (!navigator.mediaDevices?.getUserMedia) { setErr('La cámara solo está disponible con HTTPS (o en localhost). Escribe el código a mano.'); return; }
+      const constraints: MediaStreamConstraints = { audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } };
       try {
-        const { BrowserMultiFormatReader } = await import('@zxing/browser');
-        const controls = await new BrowserMultiFormatReader().decodeFromVideoDevice(undefined, video.current!, (res) => { if (res && !cancelled) lookup(res.getText().replace(/\D/g, '')); });
+        type Detector = { detect(v: HTMLVideoElement): Promise<{ rawValue: string }[]> };
+        const BD = (window as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => Detector }).BarcodeDetector;
+        if (BD) {
+          // Detector nativo del navegador: bastante más fiable que ZXing con códigos pequeños o inclinados.
+          const detector = new BD({ formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'] });
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          const v = video.current!;
+          if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+          v.srcObject = stream; await v.play().catch(() => {});
+          const timer = setInterval(async () => {
+            if (v.readyState < 2) return;
+            try { const r = await detector.detect(v); if (r[0]) onCode(r[0].rawValue); } catch { /* fotograma no legible */ }
+          }, 150);
+          stop = () => { clearInterval(timer); stream.getTracks().forEach((t) => t.stop()); };
+          return;
+        }
+        const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }] = await Promise.all([import('@zxing/browser'), import('@zxing/library')]);
+        const hints = new Map<number, unknown>([
+          [DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E, BarcodeFormat.CODE_128]],
+          [DecodeHintType.TRY_HARDER, true],
+        ]);
+        const controls = await new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 100 }).decodeFromConstraints(constraints, video.current!, (res) => { if (res) onCode(res.getText()); });
         stop = () => controls.stop();
         if (cancelled) controls.stop();
       } catch { setErr('No se pudo acceder a la cámara (permiso denegado o no disponible). Escribe el código a mano.'); }
@@ -247,7 +282,7 @@ function FoodDetail({ item, date, type, setType, onBack, onSaved, onChanged }: {
     try {
       let id = item.id;
       if (!id) {
-        const created = await api<FoodData>('/foods', { method: 'POST', body: JSON.stringify({ name: item.name, brand: item.brand ?? undefined, barcode: item.barcode ?? undefined, per100: item.per100, servingG: item.servingG ?? undefined, servingName: item.servingName ?? undefined, source: 'OPEN_FOOD_FACTS' }) });
+        const created = await api<FoodData>('/foods', { method: 'POST', body: JSON.stringify({ name: item.name, brand: item.brand ?? undefined, barcode: item.barcode ?? undefined, per100: item.per100, servingG: item.servingG ?? undefined, servingName: item.servingName ?? undefined, unitName: item.unitName ?? undefined, unitGrams: item.unitGrams ?? undefined, source: item.source === 'OPEN_FOOD_FACTS' ? 'OPEN_FOOD_FACTS' : 'MANUAL' }) });
         id = created.id;
       }
       await api('/diary/entries', { method: 'POST', body: JSON.stringify({ date, type, kind: item.kind, id, grams: Math.round(grams * 10) / 10 }) });
@@ -270,7 +305,7 @@ function FoodDetail({ item, date, type, setType, onBack, onSaved, onChanged }: {
         <button onClick={onBack} className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ink-2"><ChevronLeft className="size-4" aria-hidden />Volver</button>
         {item.id && <button onClick={fav} aria-pressed={!!item.isFavorite} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-2"><Star className={`size-[18px] ${item.isFavorite ? 'fill-warn text-warn' : ''}`} aria-hidden />{item.isFavorite ? 'Favorito' : 'Marcar favorito'}</button>}
       </div>
-      <p className="t-meta">{item.brand ? `${item.brand} · ` : ''}{Math.round(item.per100.kcal)} kcal por 100 g{item.source === 'OPEN_FOOD_FACTS' ? ' · fuente: Open Food Facts' : ''}</p>
+      <p className="t-meta">{item.brand ? `${item.brand} · ` : ''}{Math.round(item.per100.kcal)} kcal por 100 g{item.source === 'OPEN_FOOD_FACTS' ? ' · fuente: Open Food Facts' : item.source === 'GENERIC' ? ' · valores orientativos de un plato casero' : ''}</p>
       {item.missing?.length ? <Notice tone="warn">Open Food Facts no aporta: {item.missing.join(', ')}. Se guardan como 0 (desconocido, no medido).</Notice> : null}
       {nutrientsLookInconsistent(item.per100) && <Notice tone="warn">Las calorías no cuadran con los macronutrientes; revisa la etiqueta.</Notice>}
 

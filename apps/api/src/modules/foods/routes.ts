@@ -1,4 +1,4 @@
-import { foodCreateSchema } from '@fittrack/shared';
+import { foodCreateSchema, searchGenericFoods } from '@fittrack/shared';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { foodToItem, productToItem } from '../../lib/foodrows';
@@ -19,7 +19,11 @@ export const foodRoutes: FastifyPluginAsync = async (app) => {
       db.food.findMany({ where: q ? where : { userId, isFavorite: true }, orderBy: [{ isFavorite: 'desc' }, { name: 'asc' }], take: 25 }),
       db.foodProduct.findMany({ where: q ? where : { userId, OR: [{ isFavorite: true }, { usageCount: { gt: 0 } }] }, orderBy: [{ isFavorite: 'desc' }, { usageCount: 'desc' }, { name: 'asc' }], take: 25 }),
     ]);
-    return { items: [...products.map(productToItem), ...foods.map(foodToItem)] };
+    const mine = [...products.map(productToItem), ...foods.map(foodToItem)];
+    // Alimentos genéricos y caseros (patatas fritas caseras, arroz cocido…). Se omiten los que ya tienes guardados con el mismo nombre.
+    const have = new Set(mine.map((i) => i.name.toLowerCase()));
+    const generic = q ? searchGenericFoods(q).filter((g) => !have.has(g.name.toLowerCase())) : [];
+    return { items: [...mine, ...generic] };
   });
 
   app.get('/off/search', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (req, reply) => {
@@ -38,7 +42,12 @@ export const foodRoutes: FastifyPluginAsync = async (app) => {
     const local = await db.foodProduct.findUnique({ where: { userId_barcode: { userId: req.user.sub, barcode: code } } });
     if (local) return { status: 'found', origin: 'local', item: productToItem(local) };
     try {
-      const r = await offByBarcode(app.fetchImpl, code);
+      let r = await offByBarcode(app.fetchImpl, code);
+      // Un UPC-A (12 cifras) figura en OFF como EAN-13 con un 0 delante, y al revés.
+      if (r.status === 'not_found') {
+        const alt = code.length === 12 ? `0${code}` : code.length === 13 && code.startsWith('0') ? code.slice(1) : null;
+        if (alt) { const r2 = await offByBarcode(app.fetchImpl, alt); if (r2.status !== 'not_found') r = r2; }
+      }
       return { ...r, origin: 'off', barcode: code };
     } catch (e) {
       req.log.warn({ off: String(e) }, 'Open Food Facts: código de barras no disponible');

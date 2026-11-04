@@ -11,9 +11,14 @@ const baseEnv = { ...process.env, NODE_ENV: 'test', DATABASE_URL: process.env.TE
 const env = loadEnv(baseEnv);
 const prisma = new PrismaClient({ datasources: { db: { url: env.DATABASE_URL } } });
 let sentBodies: string[] = [];
+let plateIsFood = true;
+const anthropicReply = (o: unknown) => new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify(o) }], usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200 });
 const fake = (async (_u: string, init: RequestInit) => {
   sentBodies.push(String(init.body));
-  if (String(init.body).includes('"type":"image"')) return new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify({ items: [{ name: 'yogur natural', quantity: '4 uds' }, { name: 'tomates', quantity: null }], notes: null }) }], usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200 });
+  const body = String(init.body);
+  if (body.includes('Examina la imagen adjunta')) return anthropicReply(plateIsFood ? { isFood: true, dish: 'Puré de patata', questions: [{ id: 'q1', question: '¿Tamaño de la ración?', options: ['Pequeña', 'Normal'] }] } : { isFood: false, reason: 'es un gato', questions: [] });
+  if (body.includes('Analiza el plato')) return anthropicReply({ isFood: true, items: [{ name: 'Puré de patata', grams: 250, kcal: 220, protein: 5, carbs: 35, fat: 7 }] });
+  if (body.includes('"type":"image"')) return new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify({ items: [{ name: 'yogur natural', quantity: '4 uds' }, { name: 'tomates', quantity: null }], notes: null }) }], usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200 });
   return new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify({ options: [{ title: 'Tortilla', category: 'facil', ingredients: [{ name: 'Huevos', grams: 120 }], kcal: 300, protein: 25, carbs: 2, fat: 20, fiber: 0, steps: [] }] }) }], usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200 });
 }) as unknown as typeof fetch;
 
@@ -155,6 +160,29 @@ describe('despensa y lista de la compra', () => {
     const r = await call('POST', '/api/ai/recommend', { date: DAY });
     expect(r.statusCode).toBe(200);
     expect(JSON.parse(sentBodies[0]!).messages[0].content).toContain('"alimentosDisponibles":["Arroz","Huevos"]');
+  });
+});
+
+describe('foto del plato', () => {
+  const image = { mime: 'image/jpeg', data: jpeg.toString('base64').padEnd(200, 'A') };
+  it('comprueba que es comida y devuelve preguntas; con otra cosa da error NOT_FOOD', async () => {
+    plateIsFood = true;
+    const ok = await call('POST', '/api/ai/plate/inspect', { image });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().questions).toHaveLength(1);
+    plateIsFood = false;
+    const no = await call('POST', '/api/ai/plate/inspect', { image });
+    expect(no.statusCode).toBe(422);
+    expect(no.json().error).toBe('NOT_FOOD');
+    plateIsFood = true;
+  });
+  it('estima el plato con las respuestas del usuario', async () => {
+    sentBodies = [];
+    const r = await call('POST', '/api/ai/plate/analyze', { image, answers: [{ question: '¿Tamaño?', answer: 'Normal' }] });
+    expect(r.statusCode).toBe(200);
+    expect(r.json().isEstimate).toBe(true);
+    expect(r.json().items[0].name).toBe('Puré de patata');
+    expect(sentBodies[0]).toContain('Normal');
   });
 });
 

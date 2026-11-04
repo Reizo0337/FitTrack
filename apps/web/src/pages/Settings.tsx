@@ -98,7 +98,7 @@ function Goals() {
   );
 }
 
-type AICfg = { consent: boolean; providers: { provider: string; hasKey: boolean }[]; tasks: { task: string; provider: string; model: string }[]; defaults: Record<string, Record<string, string>>; usageToday: { calls: number; limit: number; tokensIn: number; tokensOut: number } };
+type AICfg = { consent: boolean; providers: { provider: string; hasKey: boolean }[]; tasks: { task: string; provider: string; model: string }[]; defaults: Record<string, Record<string, string>>; usageToday: { calls: number;tokensIn: number; tokensOut: number } };
 const PROV: Record<string, string> = { ANTHROPIC: 'Anthropic Claude', GEMINI: 'Google Gemini', OPENAI: 'OpenAI' };
 const TASK: Record<string, string> = { NUTRITIONIST: 'Nutricionista (chat y menús)', FOOD_RECOGNITION: 'Reconocimiento de comidas', WEEKLY_ANALYSIS: 'Análisis semanal' };
 
@@ -145,7 +145,7 @@ function AISettings() {
         <p className="t-meta">Los nombres de modelo cambian con el tiempo: verifícalos en la documentación del proveedor.</p>
         <Button variant="secondary" onClick={saveTasks}>Guardar modelos</Button>
       </div>
-      <p className="t-meta border-t border-line pt-3">Uso de hoy: {data.usageToday.calls} de {data.usageToday.limit} llamadas · {(data.usageToday.tokensIn + data.usageToday.tokensOut).toLocaleString('es')} tokens.</p>
+      <p className="t-meta border-t border-line pt-3">Uso de hoy: {data.usageToday.calls} llamadas · {(data.usageToday.tokensIn + data.usageToday.tokensOut).toLocaleString('es')} tokens.</p>
       <Sheet open={!!keyFor} onClose={() => setKeyFor(null)} title={`Clave de ${keyFor ? PROV[keyFor] : ''}`}>
         <form onSubmit={saveKey} className="flex flex-col gap-3">
           <FormField label="Clave API" name="key" type="password" autoComplete="off" required minLength={10} autoFocus hint="Se cifra en el servidor y no se vuelve a mostrar." />

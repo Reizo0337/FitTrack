@@ -12,13 +12,13 @@ const FIELDS: ['kcal' | 'protein' | 'carbs' | 'fat', string][] = [['kcal', 'kcal
 const n = (v: string) => Number(v.replace(',', '.')) || 0;
 
 /** Registro por lenguaje natural: la IA estima, tú revisas y confirmas. Nada se guarda antes. */
-export function LogTab({ initialText }: { initialText?: string } = {}) {
+export function LogTab({ initialText, initial, date, mealType, onDone }: { initialText?: string; initial?: { items: Item[]; notes: string | null }; date?: string; mealType?: MealTypeId; onDone?: () => void } = {}) {
   const { bump } = useApp();
   const toast = useToast();
   const [text, setText] = useState(initialText ?? '');
-  const [type, setType] = useState<MealTypeId>(defaultMeal());
-  const [items, setItems] = useState<Item[] | null>(null);
-  const [notes, setNotes] = useState<string | null>(null);
+  const [type, setType] = useState<MealTypeId>(mealType ?? defaultMeal());
+  const [items, setItems] = useState<Item[] | null>(initial?.items ?? null);
+  const [notes, setNotes] = useState<string | null>(initial?.notes ?? null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<unknown>();
 
@@ -40,8 +40,8 @@ export function LogTab({ initialText }: { initialText?: string } = {}) {
   async function confirm() {
     setBusy(true); setErr(undefined);
     try {
-      await api('/ai/food/confirm', { method: 'POST', body: JSON.stringify({ date: todayStr(), type, items: items!.map(({ confidence: _c, assumption: _a, inconsistent: _i, ...rest }) => rest) }) });
-      toast(`Guardado en ${MEAL_LABELS[type].toLowerCase()} como estimación`); setItems(null); setText(''); bump();
+      await api('/ai/food/confirm', { method: 'POST', body: JSON.stringify({ date: date ?? todayStr(), type, items: items!.map(({ confidence: _c, assumption: _a, inconsistent: _i, ...rest }) => rest) }) });
+      toast(`Guardado en ${MEAL_LABELS[type].toLowerCase()} como estimación`); setItems(null); setText(''); bump(); onDone?.();
     } catch (e) { setErr(e); } finally { setBusy(false); }
   }
   const total = items?.reduce((a, i) => ({ kcal: a.kcal + i.kcal, p: a.p + i.protein }), { kcal: 0, p: 0 });
@@ -74,7 +74,7 @@ export function LogTab({ initialText }: { initialText?: string } = {}) {
       ))}
       <p className="num t-body px-1">Total ≈ <b>{Math.round(total!.kcal)} kcal</b> · {Math.round(total!.p)} g de proteína</p>
       <AIError e={err} />
-      <div className="flex gap-2"><Button block loading={busy} disabled={!items.length} onClick={confirm}>Guardar en {MEAL_LABELS[type].toLowerCase()}</Button><Button variant="secondary" onClick={() => setItems(null)}>Descartar</Button></div>
+      <div className="flex gap-2"><Button block loading={busy} disabled={!items.length} onClick={confirm}>Guardar en {MEAL_LABELS[type].toLowerCase()}</Button><Button variant="secondary" onClick={() => { setItems(null); onDone?.(); }}>Descartar</Button></div>
     </div>
   );
 }

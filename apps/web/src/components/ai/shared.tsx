@@ -6,8 +6,8 @@ export const friendly = (e: unknown) => {
   if (e instanceof ApiError) {
     if (e.code === 'AI_CONSENT_REQUIRED') return 'Activa el consentimiento de IA en Ajustes para que pueda consultar tus datos.';
     if (e.code === 'AI_KEY_MISSING') return 'Falta la clave API del proveedor. Añádela en Ajustes → Asistente de IA.';
-    if (e.code === 'AI_DAILY_LIMIT') return 'Has alcanzado el límite diario de consultas.';
     if (e.code === 'AI_PROVIDER_AUTH') return 'El proveedor rechazó la clave API. Revísala en Ajustes.';
+    if (e.code === 'NOT_FOOD') return e.detail ?? 'Eso no parece comida. Haz la foto a un plato o alimento.';
     if (e.code === 'AI_BAD_OUTPUT') return 'El modelo no devolvió una respuesta utilizable. Inténtalo de nuevo.';
     if (e.detail) return e.detail;
   }

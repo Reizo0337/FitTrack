@@ -1,13 +1,13 @@
 import {
-  aiConfigRequest, aiFoodParse, aiPantryScan, pantryScanRequest, aiKeyRequest, aiMenu, aiRecommend, aiWeeklyNarrative, chatRequest, findViolations, foodConfirmRequest,
+  aiConfigRequest, aiFoodParse, aiPlateAnalyze, aiPlateInspect, plateAnalyzeRequest, plateInspectRequest, aiPantryScan, pantryScanRequest, aiKeyRequest, aiMenu, aiRecommend, aiWeeklyNarrative, chatRequest, findViolations, foodConfirmRequest,
   foodParseRequest, localDate, menuRequest, nutrientsLookInconsistent, recommendRequest, type AiMenu,
 } from '@fittrack/shared';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { buildContext, weeklyStats } from '../../ai/context';
-import { CHAT_PROMPT, FOOD_PARSE_PROMPT, MENU_PROMPT, PANTRY_SCAN_PROMPT, RECOMMEND_PROMPT, WEEKLY_PROMPT } from '../../ai/prompts';
+import { CHAT_PROMPT, FOOD_PARSE_PROMPT, MENU_PROMPT, PANTRY_SCAN_PROMPT, PLATE_ANALYZE_PROMPT, PLATE_INSPECT_PROMPT, RECOMMEND_PROMPT, WEEKLY_PROMPT } from '../../ai/prompts';
 import { DEFAULT_MODELS } from '../../ai/providers';
-import { cacheKey, getTaskConfig, runJson, runText, type AIDeps } from '../../ai/service';
+import { AIError, cacheKey, getTaskConfig, runJson, runText, type AIDeps } from '../../ai/service';
 import { toDbDate } from '../../lib/dates';
 import { encryptSecret } from '../../security';
 import { getOrCreateMeal, recomputeDaily } from '../diary/service';
@@ -39,7 +39,7 @@ export const aiRoutes: FastifyPluginAsync = async (app) => {
       providers: PROVIDERS.map((p) => ({ provider: p, hasKey: keys.some((k) => k.provider === p) })),
       tasks: await Promise.all(TASKS.map(async (t) => ({ task: t, ...(await getTaskConfig(db, userId, t)) }))),
       defaults: DEFAULT_MODELS,
-      usageToday: { calls: usage.reduce((a, u) => a + u.calls, 0), limit: app.env.AI_DAILY_LIMIT, tokensIn: usage.reduce((a, u) => a + u.tokensIn, 0), tokensOut: usage.reduce((a, u) => a + u.tokensOut, 0) },
+      usageToday: { calls: usage.reduce((a, u) => a + u.calls, 0),tokensIn: usage.reduce((a, u) => a + u.tokensIn, 0), tokensOut: usage.reduce((a, u) => a + u.tokensOut, 0) },
     };
   });
   app.put('/config', async (req) => {
@@ -84,6 +84,34 @@ export const aiRoutes: FastifyPluginAsync = async (app) => {
     });
     await recomputeDaily(db, userId, b.date);
     return reply.code(201).send({ saved: b.items.length });
+  });
+
+  // ---------- Foto del plato ----------
+  // La imagen se envía al proveedor solo para esta petición; no se guarda. Paso 1: comprobar que es comida y preguntar.
+  const NOT_FOOD = (reason?: string | null) => new AIError(422, 'NOT_FOOD', reason ? `Eso no parece comida: ${reason}` : 'Eso no parece comida. Haz la foto a un plato o alimento.');
+
+  app.post('/plate/inspect', { bodyLimit: 4_000_000, config: { rateLimit: { max: 15, timeWindow: '1 minute' } } }, async (req) => {
+    const b = plateInspectRequest.parse(req.body);
+    const { data } = await runJson(deps(req.user.sub), 'FOOD_RECOGNITION', {
+      prompt: PLATE_INSPECT_PROMPT, user: 'Examina la imagen adjunta.', schema: aiPlateInspect, images: [b.image], maxTokens: 900,
+    });
+    if (!data.isFood) throw NOT_FOOD(data.reason);
+    return { dish: data.dish ?? null, questions: data.questions };
+  });
+
+  // Paso 2: estimación con las respuestas. La IA vuelve a comprobar que es comida.
+  app.post('/plate/analyze', { bodyLimit: 4_000_000, config: { rateLimit: { max: 15, timeWindow: '1 minute' } } }, async (req) => {
+    const b = plateAnalyzeRequest.parse(req.body);
+    const { data } = await runJson(deps(req.user.sub), 'FOOD_RECOGNITION', {
+      prompt: PLATE_ANALYZE_PROMPT, user: `Analiza el plato de la imagen.\n${wrap('datos_usuario', { respuestas: b.answers })}`, schema: aiPlateAnalyze, images: [b.image], maxTokens: 2500,
+    });
+    if (!data.isFood || !data.items.length) throw NOT_FOOD(data.reason);
+    return {
+      isEstimate: true,
+      disclaimer: 'Valores estimados por IA a partir de una foto, no exactos. Revísalos y corrígelos antes de guardar.',
+      notes: data.notes ?? null,
+      items: data.items.map((i) => ({ ...i, inconsistent: nutrientsLookInconsistent({ kcal: i.kcal, protein: i.protein, carbs: i.carbs, fat: i.fat, satFat: i.satFat, fiber: i.fiber, sugars: i.sugars, salt: i.salt }) })),
+    };
   });
 
   // ---------- Despensa por foto ----------
