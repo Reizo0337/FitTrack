@@ -1,6 +1,12 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { Flame, SlidersHorizontal, Trophy } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
 import { api } from '../api';
-import { todayStr, useApp } from '../ctx';
+import { useApp } from '../ctx';
+import { useData } from '../hooks';
+import { todayStr } from '../ui/DateSelector';
+import { Sheet, useToast } from '../ui/overlays';
+import { Badge, Button, Card, FormField, LoadingState, Notice, SectionHeader, cx } from '../ui/primitives';
+import { ProgressBar } from '../ui/progress';
 
 type G = {
   kind: string; label: string; unit: string; period: 'DAY' | 'WEEK'; target: number; active: boolean;
@@ -11,59 +17,84 @@ type Data = {
   milestones: { marks: { kg: number; reached: boolean }[]; next: { kg: number } | null; lostKg: number | null };
 };
 
-const dot = (m: boolean | null) => (m === true ? 'bg-accent' : m === false ? 'bg-slate-400 dark:bg-slate-600' : 'bg-slate-200 dark:bg-slate-800');
+const dot = (m: boolean | null) => (m === true ? 'bg-accent' : m === false ? 'bg-line-strong' : 'bg-surface-2');
 
-/** Metas y constancia. Sin datos ≠ fallo: los días sin dato no cuentan en contra. */
-export function Challenges({ compact = false }: { compact?: boolean }) {
-  const { version, bump } = useApp();
-  const [d, setD] = useState<Data | null>(null);
-  const [msg, setMsg] = useState('');
-  const load = useCallback(() => api<Data>(`/goals?date=${todayStr()}`).then(setD).catch(() => undefined), []);
-  useEffect(() => { load(); }, [load, version]);
-  if (!d) return null;
+/** Metas y constancia. «Sin dato» no cuenta como fallo: los días sin registro no penalizan. */
+export function Challenges({ compact = false, embedded = false }: { compact?: boolean; embedded?: boolean }) {
+  const { data: d, loading } = useData<Data>(`/goals?date=${todayStr()}`);
+  const [editing, setEditing] = useState(false);
+  if (loading || !d) return <LoadingState rows={1} />;
   const active = d.goals.filter((g) => g.active);
-
-  async function save(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = e.currentTarget; const f = new FormData(form);
-    const items = d!.goals.map((g) => ({ kind: g.kind, target: Number(String(f.get(`t-${g.kind}`)).replace(',', '.')), active: f.get(`a-${g.kind}`) === 'on' }));
-    try { await api('/goals', { method: 'PUT', body: JSON.stringify({ items }) }); setMsg('Metas guardadas.'); bump(); } catch { setMsg('Revisa los valores.'); }
-  }
+  const adjust = <Button variant="secondary" size="sm" icon={SlidersHorizontal} onClick={() => setEditing(true)}>Ajustar</Button>;
 
   return (
-    <section className="card flex flex-col gap-3">
-      <div><h2 className="font-semibold">Metas de hoy</h2><p className="text-sm text-slate-500">{d.summary.message}</p></div>
-      {!active.length && <p className="text-sm text-slate-500">No hay metas activas.</p>}
-      <ul className="flex flex-col gap-2">
-        {active.map((g) => (
-          <li key={g.kind} className="text-sm">
-            <div className="flex items-center justify-between gap-2">
-              <span>{g.today.met ? '✓ ' : ''}{g.label}</span>
-              <span className="text-slate-500">{g.today.value == null ? 'sin dato' : `${g.today.value} / ${g.target} ${g.unit}`}{g.period === 'WEEK' ? ' (7 días)' : ''}</span>
-            </div>
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800" role="progressbar" aria-label={g.label} aria-valuenow={Math.round(Math.min(100, ((g.today.value ?? 0) / g.target) * 100))} aria-valuemin={0} aria-valuemax={100}>
-              <div className="h-full rounded-full bg-accent transition-all duration-500" style={{ width: `${Math.min(100, ((g.today.value ?? 0) / g.target) * 100)}%` }} />
-            </div>
-            {!compact && (
-              <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
-                <span className="flex gap-1" aria-label="Últimos 7 días">{g.last7.map((m, i) => <i key={i} className={`size-2.5 rounded-full ${dot(m)}`} />)}</span>
-                <span>{g.streak != null ? `racha ${g.streak} d · mejor ${g.bestStreak}` : ''}{g.compliance30 != null ? ` · ${g.compliance30} % en 30 d` : ''}</span>
-              </div>
-            )}
-          </li>
+    <div>
+      {!embedded && <SectionHeader title="Metas de hoy" action={!compact ? adjust : undefined} />}
+      <Card>
+        {embedded && <div className="mb-3 flex items-center justify-between gap-2"><h2 className="t-head">Metas de hoy</h2>{adjust}</div>}
+        <p className="t-body">{d.summary.message}</p>
+        {!active.length ? <p className="t-meta mt-3">No hay metas activas.</p> : (
+          <ul className="mt-4 flex flex-col gap-4">
+            {active.map((g) => {
+              const v = g.today.value, pct = v == null ? 0 : v / g.target;
+              return (
+                <li key={g.kind}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className={cx('text-[0.9375rem] font-medium', g.today.met && 'text-accent-strong')}>{g.label}</span>
+                    <span className="num t-meta">{v == null ? 'sin dato' : `${v.toLocaleString('es')} / ${g.target.toLocaleString('es')} ${g.unit}`}{g.period === 'WEEK' ? ' · 7 días' : ''}</span>
+                  </div>
+                  <div className="mt-1.5"><ProgressBar value={pct} tone={g.today.met ? 'accent' : 'ink'} label={g.label} /></div>
+                  {!compact && (
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <span className="flex gap-1" role="img" aria-label="Últimos 7 días">{g.last7.map((m, i) => <i key={i} className={cx('size-2.5 rounded-full', dot(m))} />)}</span>
+                      <span className="flex flex-wrap justify-end gap-1.5">
+                        {g.streak != null && g.streak > 0 && <Badge tone="accent"><Flame className="mr-1 size-3" aria-hidden />{g.streak} {g.streak === 1 ? 'día' : 'días'}</Badge>}
+                        {g.compliance30 != null && <Badge>{g.compliance30} % en 30 d</Badge>}
+                      </span>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {!compact && (
+          <div className="mt-5 border-t border-line pt-4">
+            <h3 className="t-head mb-2 flex items-center gap-2"><Trophy className="size-[18px] text-ink-2" aria-hidden />Hitos de peso</h3>
+            <ul className="flex flex-wrap gap-1.5">{d.milestones.marks.map((m) => <li key={m.kg}><Badge tone={m.reached ? 'accent' : 'neutral'}>{m.kg} kg</Badge></li>)}</ul>
+            <p className="t-meta mt-2">{d.milestones.lostKg == null ? 'Registra tu peso para ver tus hitos.' : d.milestones.next ? `Llevas ${d.milestones.lostKg} kg menos. Próximo hito: ${d.milestones.next.kg} kg.` : '¡Objetivo alcanzado!'}</p>
+          </div>
+        )}
+      </Card>
+      <GoalsSheet open={editing} goals={d.goals} onClose={() => setEditing(false)} />
+    </div>
+  );
+}
+
+function GoalsSheet({ open, goals, onClose }: { open: boolean; goals: G[]; onClose: () => void }) {
+  const { bump } = useApp();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  async function save(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    const items = goals.map((g) => ({ kind: g.kind, target: Number(String(f.get(`t-${g.kind}`)).replace(',', '.')), active: f.get(`a-${g.kind}`) === 'on' }));
+    setBusy(true);
+    try { await api('/goals', { method: 'PUT', body: JSON.stringify({ items }) }); toast('Metas guardadas'); bump(); onClose(); }
+    catch { toast('Revisa los valores', 'error'); } finally { setBusy(false); }
+  }
+  return (
+    <Sheet open={open} onClose={onClose} title="Ajustar metas">
+      <form onSubmit={save} className="flex flex-col gap-3">
+        {goals.map((g) => (
+          <div key={g.kind} className="flex items-end gap-3">
+            <label className="flex min-h-11 flex-1 items-center gap-3 pb-0.5 text-sm"><input type="checkbox" name={`a-${g.kind}`} defaultChecked={g.active} className="size-5 accent-[var(--accent)]" />{g.label}</label>
+            <FormField className="w-28" label={g.unit} name={`t-${g.kind}`} defaultValue={g.target} inputMode="decimal" aria-label={`Objetivo de ${g.label}`} />
+          </div>
         ))}
-      </ul>
-      {!compact && (<>
-        <div><h3 className="text-sm font-semibold">Hitos de peso</h3>
-          <div className="mt-1 flex flex-wrap gap-1.5">{d.milestones.marks.map((m) => <span key={m.kg} className={`rounded-full px-2 py-0.5 text-xs ${m.reached ? 'bg-accent text-[#052e1d]' : 'bg-slate-200 text-slate-500 dark:bg-slate-800'}`}>{m.kg} kg</span>)}</div>
-          <p className="mt-1 text-xs text-slate-500">{d.milestones.lostKg == null ? 'Registra tu peso para ver tus hitos.' : d.milestones.next ? `Llevas ${d.milestones.lostKg} kg menos. Próximo hito: ${d.milestones.next.kg} kg.` : '¡Objetivo alcanzado!'}</p></div>
-        <details><summary className="cursor-pointer text-sm text-slate-500">Ajustar metas</summary>
-          <form onSubmit={save} className="mt-2 flex flex-col gap-2">
-            {d.goals.map((g) => (<div key={g.kind} className="flex items-center gap-2 text-sm"><label className="flex flex-1 items-center gap-2"><input type="checkbox" name={`a-${g.kind}`} defaultChecked={g.active} className="size-4" />{g.label}</label>
-              <input name={`t-${g.kind}`} defaultValue={g.target} inputMode="decimal" className="input w-24 py-1.5" aria-label={`Objetivo de ${g.label}`} /><span className="w-14 text-xs text-slate-500">{g.unit}</span></div>))}
-            {msg && <p role="status" className="text-xs text-slate-500">{msg}</p>}
-            <button className="btn">Guardar metas</button></form></details>
-      </>)}
-    </section>
+        <Notice tone="info">Los días sin datos no cuentan como fallo. Puedes desactivar cualquier meta.</Notice>
+        <Button type="submit" loading={busy} block>Guardar metas</Button>
+      </form>
+    </Sheet>
   );
 }

@@ -1,91 +1,107 @@
-import { useCallback, useEffect, useState } from 'react';
-import { MEAL_LABELS, type MealTypeId, type Nutrients } from '@fittrack/shared';
+import { Droplets, Search, ShoppingBasket, Undo2 } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
-import { Bar } from '../components/Chart';
-import { shiftDate, todayStr, useApp } from '../ctx';
-
-export type Entry = { id: string; name: string; grams: number; isEstimate: boolean; nutrients: Nutrients };
-export type Diary = {
-  date: string; meals: { type: MealTypeId; entries: Entry[]; totals: Nutrients }[]; totals: Nutrients;
-  targets: { kcal: number; protein: number; fat: number; carbs: number; fiber: number; waterMl: number };
-  remaining: Record<string, number>; waterMl: number;
-  productAlerts: { productId: string; name: string; servings: number; max: number; level: 'ok' | 'warn'; messages: string[] }[];
-};
+import { CalorieSummary, MealCard, NutritionDetail } from '../components/nutrition';
+import { PageHeader } from '../components/PageHeader';
+import { shiftDate, useApp } from '../ctx';
+import { useData } from '../hooks';
+import type { Diary, Entry } from '../types';
+import { DateSelector } from '../ui/DateSelector';
+import { ConfirmSheet, Sheet, useToast } from '../ui/overlays';
+import { Button, Card, ErrorState, FormField, LoadingState, Notice, SectionHeader } from '../ui/primitives';
+import { ProgressBar } from '../ui/progress';
 
 export function Food() {
-  const { date, setDate, version, bump, openAdd } = useApp();
-  const [d, setD] = useState<Diary | null>(null);
-  const [err, setErr] = useState('');
-  const load = useCallback(() => api<Diary>(`/diary?date=${date}`).then((r) => { setD(r); setErr(''); }).catch(() => setErr('No se pudo cargar el diario.')), [date]);
-  useEffect(() => { load(); }, [load, version]);
+  const { date, setDate, bump, openAdd } = useApp();
+  const toast = useToast();
+  const { data: d, error, loading, reload } = useData<Diary>(`/diary?date=${date}`);
+  const [editing, setEditing] = useState<Entry | null>(null);
+  const [deleting, setDeleting] = useState<Entry | null>(null);
 
-  async function del(id: string) { await api(`/diary/entries/${id}`, { method: 'DELETE' }); bump(); }
-  async function edit(e: Entry) {
-    const v = prompt(`Gramos de ${e.name}`, String(e.grams));
-    const g = v == null ? NaN : Number(v.replace(',', '.'));
-    if (g > 0 && g <= 5000) { await api(`/diary/entries/${e.id}`, { method: 'PATCH', body: JSON.stringify({ grams: g }) }); bump(); }
-  }
-  async function repeatYesterday(type: MealTypeId) {
+  async function repeat(type: string) {
     const r = await api<{ copied: number }>('/diary/copy', { method: 'POST', body: JSON.stringify({ fromDate: shiftDate(date, -1), toDate: date, type }) });
-    if (!r.copied) alert('Ayer no registraste esta comida.');
+    toast(r.copied ? 'Comida repetida del día anterior' : 'El día anterior no tiene esta comida', r.copied ? 'success' : 'info');
     bump();
   }
-
-  if (err) return <p role="alert" className="text-red-500">{err}</p>;
-  if (!d) return <p className="text-slate-500">Cargando…</p>;
-  const left = Math.round(d.remaining.kcal ?? 0);
+  async function water(ml: number) { await api('/diary/water', { method: 'POST', body: JSON.stringify({ date, ml }) }); bump(); }
+  async function undoWater() { await api(`/diary/water/last?date=${date}`, { method: 'DELETE' }).catch(() => undefined); bump(); }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <button className="rounded-lg px-3 py-2" onClick={() => setDate(shiftDate(date, -1))} aria-label="Día anterior">‹</button>
-        <div className="text-center"><b>{date === todayStr() ? 'Hoy' : date}</b>{date !== todayStr() && <button className="ml-2 text-xs text-accent" onClick={() => setDate(todayStr())}>ir a hoy</button>}</div>
-        <button className="rounded-lg px-3 py-2 disabled:opacity-30" disabled={date >= todayStr()} onClick={() => setDate(shiftDate(date, 1))} aria-label="Día siguiente">›</button>
+    <>
+      <PageHeader title="Alimentación" />
+      <div className="mb-4 flex flex-col gap-3">
+        <DateSelector date={date} onChange={setDate} />
+        <button onClick={() => openAdd({})} className="flex min-h-12 items-center gap-3 rounded-ctl border border-line bg-surface px-4 text-left text-ink-3 transition hover:bg-surface-2">
+          <Search className="size-[18px]" aria-hidden /> Buscar o añadir un alimento
+        </button>
+        <Link to="/pantry" className="inline-flex min-h-11 items-center gap-2 self-start px-1 text-sm font-medium text-accent-strong"><ShoppingBasket className="size-[18px]" aria-hidden />Despensa y lista de la compra</Link>
       </div>
 
-      <section className="card">
-        <div className="flex items-baseline justify-between"><span className="text-2xl font-bold">{Math.round(d.totals.kcal)} <span className="text-sm font-normal text-slate-500">/ {d.targets.kcal} kcal</span></span><span className={left < 0 ? 'text-amber-500' : 'text-slate-500'}>{left >= 0 ? `${left} restantes` : `${-left} por encima`}</span></div>
-        <div className="mt-3 grid gap-2">
-          <Bar label="Proteínas" value={d.totals.protein} target={d.targets.protein} color="#60a5fa" />
-          <Bar label="Carbohidratos" value={d.totals.carbs} target={d.targets.carbs} color="#fbbf24" />
-          <Bar label="Grasas" value={d.totals.fat} target={d.targets.fat} color="#f472b6" />
-          <Bar label="Fibra" value={d.totals.fiber} target={d.targets.fiber} color="#a78bfa" />
-        </div>
-      </section>
-
-      <Link to="/pantry" className="text-sm text-accent">🧺 Despensa y lista de la compra ›</Link>
-
-      {d.productAlerts.map((a) => (
-        <div key={a.productId} role="note" className={`rounded-xl border-l-4 p-3 text-sm ${a.level === 'warn' ? 'border-amber-500 bg-amber-500/10' : 'border-sky-500 bg-sky-500/10'}`}>
-          <b>{a.name}: {a.servings} / {a.max} raciones</b>
-          {a.messages.map((m) => <p key={m} className="mt-1 text-slate-600 dark:text-slate-300">{m}</p>)}
-        </div>
-      ))}
-
-      {d.meals.map((m) => (
-        <section key={m.type} className="card">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold">{MEAL_LABELS[m.type]} <span className="text-sm font-normal text-slate-500">{m.entries.length ? `${Math.round(m.totals.kcal)} kcal` : ''}</span></h2>
-            <div className="flex gap-1 text-sm">
-              <button className="rounded-lg px-2 py-1 text-slate-500" onClick={() => repeatYesterday(m.type)}>↺ ayer</button>
-              <button className="rounded-lg bg-accent px-3 py-1 font-semibold text-[#052e1d]" onClick={() => openAdd({ type: m.type })}>+ Añadir</button>
-            </div>
+      {loading ? <LoadingState rows={4} /> : error || !d ? <ErrorState onRetry={reload} /> : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-start">
+          <div className="flex flex-col gap-2.5">
+            <SectionHeader title="Comidas" />
+            {d.meals.map((m) => <MealCard key={m.type} meal={m} onAdd={() => openAdd({ type: m.type })} onRepeat={() => repeat(m.type)} onEdit={setEditing} onDelete={setDeleting} />)}
           </div>
-          <ul>
-            {m.entries.map((e) => (
-              <li key={e.id} className="flex items-center gap-2 border-t border-slate-200 py-2 text-sm dark:border-slate-800">
-                <button className="min-w-0 flex-1 text-left" onClick={() => edit(e)} aria-label={`Editar cantidad de ${e.name}`}>
-                  <b className="block truncate">{e.name}{e.isEstimate && <span className="ml-1 rounded bg-amber-500/20 px-1 text-xs text-amber-500">estimado</span>}</b>
-                  <span className="text-xs text-slate-500">{e.grams} g · P {e.nutrients.protein} · C {e.nutrients.carbs} · G {e.nutrients.fat}</span>
-                </button>
-                <span className="tabular-nums">{Math.round(e.nutrients.kcal)}</span>
-                <button className="px-2 text-slate-400" onClick={() => del(e.id)} aria-label={`Eliminar ${e.name}`}>🗑</button>
-              </li>
+
+          <div className="flex flex-col gap-4">
+            <CalorieSummary d={d} />
+            {d.productAlerts.map((a) => (
+              <Notice key={a.productId} tone={a.level === 'warn' ? 'warn' : 'info'}>
+                <b className="block">{a.name}: {a.servings} de {a.max} raciones</b>
+                {a.messages.map((m) => <span key={m} className="mt-1 block">{m}</span>)}
+              </Notice>
             ))}
-          </ul>
-        </section>
-      ))}
-    </div>
+            <Card>
+              <h2 className="t-head mb-3">Detalle nutricional</h2>
+              <NutritionDetail d={d} />
+              <p className="t-meta mt-3 border-t border-line pt-3">Vitaminas y minerales: aún no se registran. Open Food Facts no los aporta de forma fiable y no se muestran valores inventados.</p>
+            </Card>
+            <Card>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="t-head flex items-center gap-2"><Droplets className="size-[18px] text-ink-2" aria-hidden />Agua</h2>
+                <span className="num t-meta">{d.waterMl} / {d.targets.waterMl} ml</span>
+              </div>
+              <ProgressBar value={d.waterMl / d.targets.waterMl} height={8} label="Agua" />
+              <div className="mt-3 flex gap-2">
+                {[250, 500].map((ml) => <Button key={ml} variant="secondary" size="sm" className="flex-1" onClick={() => water(ml)}>+{ml} ml</Button>)}
+                <Button variant="ghost" size="sm" icon={Undo2} onClick={undoWater} aria-label="Deshacer último registro de agua" />
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      <EditEntry entry={editing} onClose={() => setEditing(null)} />
+      <ConfirmSheet open={!!deleting} title="Eliminar registro" text={deleting ? `Se eliminará «${deleting.name}» (${deleting.grams} g) de este día.` : ''}
+        onClose={() => setDeleting(null)}
+        onConfirm={async () => { await api(`/diary/entries/${deleting!.id}`, { method: 'DELETE' }); setDeleting(null); toast('Registro eliminado'); bump(); }} />
+    </>
+  );
+}
+
+function EditEntry({ entry, onClose }: { entry: Entry | null; onClose: () => void }) {
+  const { bump } = useApp();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  async function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const g = Number(String(new FormData(e.currentTarget).get('grams')).replace(',', '.'));
+    if (!(g > 0 && g <= 5000)) return;
+    setBusy(true);
+    try { await api(`/diary/entries/${entry!.id}`, { method: 'PATCH', body: JSON.stringify({ grams: g }) }); toast('Cantidad actualizada'); bump(); onClose(); }
+    finally { setBusy(false); }
+  }
+  return (
+    <Sheet open={!!entry} onClose={onClose} title={entry?.name ?? ''}>
+      {entry && (
+        <form onSubmit={submit} className="flex flex-col gap-3" key={entry.id}>
+          <FormField label="Cantidad (g)" name="grams" inputMode="decimal" defaultValue={entry.grams} autoFocus required />
+          <p className="t-meta">Los nutrientes se recalculan proporcionalmente a la nueva cantidad.</p>
+          <Button type="submit" loading={busy} block>Guardar</Button>
+        </form>
+      )}
+    </Sheet>
   );
 }

@@ -1,19 +1,126 @@
 @import 'tailwindcss';
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme {
-  --font-sans: ui-sans-serif, -apple-system, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif;
-  --color-accent: #22c55e;
+/* ───────────── Design tokens ─────────────
+   Paleta reducida: neutros cálidos + un verde de acento. El verde significa progreso/objetivo cumplido.
+   El modo oscuro está diseñado aparte (superficies por elevación, acento más luminoso), no es una inversión. */
+:root {
+  --bg: #f5f5f1;
+  --surface: #ffffff;
+  --surface-2: #f0f0eb;
+  --line: #e4e4dd;
+  --line-strong: #d3d3ca;
+  --ink: #161718;
+  --ink-2: #62666d;
+  --ink-3: #9a9da4;
+  --accent: #1c9a68;
+  --accent-strong: #167a53;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2f3eb;
+  --warn: #cf7a21;
+  --warn-soft: #fbeedd;
+  --danger: #cc453c;
+  --danger-soft: #fbe5e3;
+  --m-protein: #3f6dd1;
+  --m-carbs: #d39a2c;
+  --m-fat: #c4647a;
+  --shadow: 0 1px 2px rgb(20 20 18 / 0.04);
+  --shadow-pop: 0 12px 32px rgb(20 20 18 / 0.14);
+  --scrim: rgb(18 18 16 / 0.42);
+  color-scheme: light;
+}
+.dark {
+  --bg: #0c0d0f;
+  --surface: #151619;
+  --surface-2: #1d1f23;
+  --line: #26282d;
+  --line-strong: #34373d;
+  --ink: #eeeeeb;
+  --ink-2: #a2a6ad;
+  --ink-3: #6c7078;
+  --accent: #3fcf93;
+  --accent-strong: #66dbaa;
+  --accent-ink: #04251a;
+  --accent-soft: #102a22;
+  --warn: #e69a4c;
+  --warn-soft: #2d2113;
+  --danger: #ee7a71;
+  --danger-soft: #2f1816;
+  --m-protein: #7a9cf0;
+  --m-carbs: #e2b25c;
+  --m-fat: #dd8da0;
+  --shadow: none;
+  --shadow-pop: 0 14px 36px rgb(0 0 0 / 0.55);
+  --scrim: rgb(0 0 0 / 0.6);
+  color-scheme: dark;
 }
 
+@theme inline {
+  --font-sans: ui-sans-serif, -apple-system, 'SF Pro Text', 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-protein: var(--m-protein);
+  --color-carbs: var(--m-carbs);
+  --color-fat: var(--m-fat);
+  --radius-card: 16px;
+  --radius-ctl: 12px;
+}
+
+html { -webkit-text-size-adjust: 100%; }
 html, body, #root { min-height: 100%; }
-body { @apply bg-slate-50 text-slate-900 antialiased dark:bg-[#0b0f14] dark:text-slate-100; }
-.card { @apply rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition dark:border-slate-800 dark:bg-[#141b24]; }
-.btn { @apply rounded-xl bg-accent px-4 py-3 font-semibold text-[#052e1d] active:scale-[.98] transition disabled:opacity-50; }
-.input { @apply w-full rounded-xl border border-slate-300 bg-white px-3 py-3 outline-none focus:border-accent dark:border-slate-700 dark:bg-[#1b2430]; }
-
-/* Accesibilidad: respeta la preferencia de menos movimiento y muestra el foco del teclado. */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
 }
-:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+input, select, textarea { font-size: 16px; } /* 16px evita el zoom automático de iOS al enfocar */
+.num { font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+
+/* Tipografía: jerarquía corta y clara */
+.t-display { font-size: 2.25rem; line-height: 1.05; font-weight: 650; letter-spacing: -0.03em; }
+.t-title { font-size: 1.375rem; line-height: 1.2; font-weight: 650; letter-spacing: -0.02em; }
+.t-head { font-size: 1.0625rem; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; }
+.t-body { font-size: 0.9375rem; }
+.t-meta { font-size: 0.8125rem; color: var(--ink-2); }
+.t-over { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+
+/* Movimiento: sutil y funcional */
+@keyframes page-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes sheet-up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes shimmer { 0% { background-position: -200px 0; } 100% { background-position: calc(200px + 100%) 0; } }
+@keyframes pop { 0% { transform: scale(.9); opacity: 0 } 60% { transform: scale(1.04) } 100% { transform: none; opacity: 1 } }
+.page-in { animation: page-in .26s cubic-bezier(.2,.7,.2,1) both; }
+.sheet-in { animation: sheet-up .28s cubic-bezier(.2,.8,.2,1) both; }
+.fade-in { animation: fade .2s ease both; }
+.pop-in { animation: pop .35s cubic-bezier(.2,.8,.2,1) both; }
+.skeleton { background: linear-gradient(90deg, var(--surface-2) 0, var(--line) 80px, var(--surface-2) 160px); background-size: 200px 100%; animation: shimmer 1.3s infinite linear; border-radius: 8px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}
+
+/* Áreas seguras de iOS */
+.pt-safe { padding-top: max(0.75rem, env(safe-area-inset-top)); }
+.pb-safe { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }

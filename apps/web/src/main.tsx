@@ -3,11 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import './index.css';
+import { initTheme } from './ui/theme';
 
-// Tema: respeta la preferencia guardada o la del sistema.
-const stored = localStorage.getItem('theme');
-const dark = stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-document.documentElement.classList.toggle('dark', dark);
+initTheme();
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) navigator.serviceWorker.register('/sw.js').catch(() => undefined);
 

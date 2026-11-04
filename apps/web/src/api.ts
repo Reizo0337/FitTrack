@@ -29,7 +29,10 @@ export async function api<T>(path: string, init: RequestInit = {}, retry = true)
   if (accessToken) headers.set('authorization', `Bearer ${accessToken}`);
   const r = await fetch(`/api${path}`, { ...init, headers, credentials: 'include' });
   if (r.status === 401 && retry && !path.startsWith('/auth/') && (await refresh())) return api<T>(path, init, false);
-  if (!r.ok) { const j = (await r.json().catch(() => ({}))) as { error?: string; message?: string }; throw new ApiError(r.status, j.error ?? 'ERROR', j.message); }
+  if (!r.ok) {
+    const j = (await r.json().catch(() => ({}))) as { error?: string; message?: string };
+    throw new ApiError(r.status, j.error ?? 'ERROR', j.message);
+  }
   return r.json() as Promise<T>;
 }
 

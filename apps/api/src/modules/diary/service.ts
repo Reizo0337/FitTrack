@@ -68,7 +68,7 @@ export async function buildDiary(db: PrismaClient, userId: string, date: string)
   const outMeals = MEAL_TYPES.map((type) => {
     const entries = (byType.get(type)?.entries ?? []).map((e) => ({
       id: e.id, name: e.name, grams: e.grams, isEstimate: e.isEstimate, source: e.source,
-      productId: e.productId, foodId: e.foodId, nutrients: entryNutrients(e),
+      productId: e.productId, foodId: e.foodId, at: e.createdAt, nutrients: entryNutrients(e),
     }));
     return { type, entries, totals: sumNutrients(entries.map((e) => e.nutrients)) };
   });

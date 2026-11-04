@@ -18,6 +18,9 @@ Capa de proveedores intercambiable (Claude, Gemini, OpenAI) con modelo por tarea
 ## Fase 6 (cierre) — hecho
 Exportar y borrar todos tus datos, cambio de contraseña, fotos de progreso privadas, metas y rachas, despensa y lista de la compra, endurecimiento de seguridad, web servida desde el mismo origen, y guía de despliegue y copias. Detalle en [docs/FASE6.md](docs/FASE6.md) y [docs/DEPLOY.md](docs/DEPLOY.md).
 
+## Interfaz
+Rediseño completo con sistema de diseño propio (tokens, componentes, tema claro/oscuro, navegación móvil y de escritorio). Reglas para mantenerlo uniforme en [docs/UI.md](docs/UI.md).
+
 ## Ejecutar en local (Windows/Mac/Linux, sin Docker)
 ```bash
 npm install

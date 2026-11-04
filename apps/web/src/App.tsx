@@ -1,9 +1,13 @@
+import { Plus } from 'lucide-react';
 import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react';
-import { NavLink, Route, Routes } from 'react-router-dom';
+import { Route, Routes, useLocation } from 'react-router-dom';
 import { login, logout, restoreSession } from './api';
 import { AppProvider, useApp } from './ctx';
 import { Food } from './pages/Food';
 import { Home } from './pages/Home';
+import { BottomNavigation, Sidebar } from './ui/nav';
+import { ToastProvider } from './ui/overlays';
+import { Button, FormField, LoadingState } from './ui/primitives';
 
 // Páginas secundarias en carga diferida: el primer arranque descarga menos código.
 const Activity = lazy(() => import('./pages/Activity').then((m) => ({ default: m.Activity })));
@@ -18,96 +22,79 @@ function Login({ onDone }: { onDone: () => void }) {
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
-    setBusy(true);
-    setError('');
-    try {
-      await login(String(f.get('email')), String(f.get('password')));
-      onDone();
-    } catch {
-      setError('Credenciales incorrectas o demasiados intentos. Espera un minuto.');
-    } finally {
-      setBusy(false);
-    }
+    setBusy(true); setError('');
+    try { await login(String(f.get('email')), String(f.get('password'))); onDone(); }
+    catch { setError('Credenciales incorrectas o demasiados intentos. Espera un minuto.'); }
+    finally { setBusy(false); }
   }
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 p-6">
-      <h1 className="text-3xl font-bold">FitTrack</h1>
-      <p className="text-slate-500">Acceso privado.</p>
+    <main className="pt-safe pb-safe mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-6 px-6">
+      <div>
+        <span className="mb-4 flex size-11 items-center justify-center rounded-[14px] bg-accent text-accent-ink"><svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M3 12h4l3-8 4 16 3-8h4" /></svg></span>
+        <h1 className="t-title">FitTrack</h1>
+        <p className="t-meta mt-1">Acceso privado.</p>
+      </div>
       <form onSubmit={submit} className="flex flex-col gap-3">
-        <label className="sr-only" htmlFor="email">Email</label>
-        <input id="email" name="email" type="email" autoComplete="username" placeholder="Email" className="input" required />
-        <label className="sr-only" htmlFor="password">Contraseña</label>
-        <input id="password" name="password" type="password" autoComplete="current-password" placeholder="Contraseña" className="input" required minLength={8} />
-        {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
-        <button className="btn" disabled={busy}>{busy ? 'Entrando…' : 'Entrar'}</button>
+        <FormField label="Email" name="email" type="email" autoComplete="username" required />
+        <FormField label="Contraseña" name="password" type="password" autoComplete="current-password" required minLength={8} />
+        {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+        <Button type="submit" loading={busy} block>Entrar</Button>
       </form>
     </main>
   );
 }
 
-const tabs = [
-  { to: '/', label: 'Inicio', icon: '🏠' },
-  { to: '/food', label: 'Alimentación', icon: '🍽️' },
-  { to: '/activity', label: 'Actividad', icon: '👟' },
-  { to: '/progress', label: 'Progreso', icon: '📈' },
-  { to: '/ai', label: 'IA', icon: '✨' },
-];
-
-function ScanFab() {
-  const { openAdd } = useApp();
+function QuickAddButton() {
+  const { openQuick } = useApp();
   return (
-    <button onClick={() => openAdd({ tab: 'scan' })} aria-label="Escanear código de barras"
-      className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 z-10 flex size-14 items-center justify-center rounded-full bg-accent text-2xl shadow-lg active:scale-95">▮▯▮</button>
+    <button onClick={openQuick} aria-label="Registrar comida, peso o escanear"
+      className="fixed right-4 z-20 flex size-14 items-center justify-center rounded-full bg-accent text-accent-ink shadow-[var(--shadow-pop)] transition hover:bg-accent-strong active:scale-95 lg:hidden"
+      style={{ bottom: 'calc(env(safe-area-inset-bottom) + 4.75rem)' }}>
+      <Plus className="size-7" strokeWidth={2.25} aria-hidden />
+    </button>
+  );
+}
+
+function Shell({ onLogout }: { onLogout: () => void }) {
+  const { openQuick } = useApp();
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  const chat = pathname.startsWith('/ai');
+  return (
+    <div className="min-h-dvh lg:pl-60">
+      <Sidebar onQuickAdd={openQuick} />
+      <main className="mx-auto w-full max-w-xl px-4 pb-28 pt-safe lg:max-w-5xl lg:px-10 lg:pb-12 lg:pt-8">
+        <div key={pathname} className="page-in">
+          <Suspense fallback={<LoadingState rows={2} />}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/food" element={<Food />} />
+            <Route path="/activity" element={<Activity />} />
+            <Route path="/progress" element={<Progress />} />
+            <Route path="/ai" element={<AI />} />
+            <Route path="/settings" element={<Settings onLogout={onLogout} />} />
+            <Route path="/pantry" element={<Pantry />} />
+          </Routes>
+          </Suspense>
+        </div>
+      </main>
+      <BottomNavigation />
+      {!chat && <QuickAddButton />}
+    </div>
   );
 }
 
 export function App() {
   const [state, setState] = useState<'loading' | 'out' | 'in'>('loading');
-  useEffect(() => {
-    restoreSession().then((ok) => setState(ok ? 'in' : 'out'));
-  }, []);
+  useEffect(() => { restoreSession().then((ok) => setState(ok ? 'in' : 'out')); }, []);
 
-  if (state === 'loading') return <p className="p-6 text-slate-500">Cargando…</p>;
-  if (state === 'out') return <Login onDone={() => setState('in')} />;
-
-  const toggleTheme = () => {
-    const dark = document.documentElement.classList.toggle('dark');
-    localStorage.setItem('theme', dark ? 'dark' : 'light');
-  };
-
+  if (state === 'loading') return <div className="grid min-h-dvh place-items-center" role="status" aria-label="Cargando"><div className="skeleton size-10 !rounded-full" /></div>;
+  if (state === 'out') return <ToastProvider><Login onDone={() => setState('in')} /></ToastProvider>;
   return (
-    <AppProvider>
-    <div className="mx-auto min-h-screen max-w-2xl px-4 pb-28 pt-[max(1rem,env(safe-area-inset-top))]">
-      <header className="mb-4 flex justify-end gap-2 text-sm">
-        <NavLink to="/settings" className="rounded-lg px-3 py-1 text-slate-500" aria-label="Ajustes">⚙️</NavLink>
-        <button onClick={toggleTheme} className="rounded-lg px-3 py-1 text-slate-500" aria-label="Cambiar tema claro/oscuro">🌓</button>
-        <button onClick={async () => { await logout(); setState('out'); }} className="rounded-lg px-3 py-1 text-slate-500">Salir</button>
-      </header>
-      <Suspense fallback={<p className="text-slate-500" role="status">Cargando…</p>}>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/food" element={<Food />} />
-        <Route path="/activity" element={<Activity />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/progress" element={<Progress />} />
-        <Route path="/ai" element={<AI />} />
-        <Route path="/pantry" element={<Pantry />} />
-      </Routes>
-      </Suspense>
-      <nav className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-slate-800 dark:bg-[#0b0f14]/90">
-        <ul className="mx-auto flex max-w-2xl">
-          {tabs.map((t) => (
-            <li key={t.to} className="flex-1">
-              <NavLink to={t.to} end className={({ isActive }) => `flex flex-col items-center gap-0.5 py-2 text-xs ${isActive ? 'text-accent' : 'text-slate-500'}`}>
-                <span className="text-xl" aria-hidden>{t.icon}</span>
-                {t.label}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-      </nav>
-      <ScanFab />
-    </div>
-    </AppProvider>
+    <ToastProvider>
+      <AppProvider>
+        <Shell onLogout={async () => { await logout(); setState('out'); }} />
+      </AppProvider>
+    </ToastProvider>
   );
 }
