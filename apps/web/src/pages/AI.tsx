@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { EatTab } from '../components/ai/EatTab';
 import { LogTab } from '../components/ai/LogTab';
+import { Markdown } from '../components/ai/Markdown';
 import { MenuTab } from '../components/ai/MenuTab';
 import { ReportTab } from '../components/ai/ReportTab';
 import { chipClass, friendly } from '../components/ai/shared';
@@ -88,8 +89,10 @@ function ChatTab({ usage }: { usage: { calls: number; limit: number } }) {
           <ul className="flex flex-col gap-3">
             {msgs.map((m, i) => (
               <li key={i} className={cx('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
-                <p className={cx('max-w-[88%] whitespace-pre-wrap rounded-[18px] px-4 py-2.5 text-[0.9375rem] leading-relaxed',
-                  m.role === 'user' ? 'rounded-br-md bg-accent text-accent-ink' : m.error ? 'rounded-bl-md bg-warn-soft' : 'rounded-bl-md border border-line bg-surface')}>{m.content}</p>
+                <div className={cx('max-w-[88%] rounded-[18px] px-4 py-2.5 text-[0.9375rem] leading-relaxed',
+                  m.role === 'user' ? 'whitespace-pre-wrap rounded-br-md bg-accent text-accent-ink' : m.error ? 'whitespace-pre-wrap rounded-bl-md bg-warn-soft' : 'rounded-bl-md border border-line bg-surface')}>
+                  {m.role === 'assistant' && !m.error ? <Markdown>{m.content}</Markdown> : m.content}
+                </div>
               </li>
             ))}
             {busy && <li className="flex"><span className="flex gap-1 rounded-[18px] rounded-bl-md border border-line bg-surface px-4 py-3" role="status" aria-label="Escribiendo">{[0, 1, 2].map((d) => <i key={d} className="size-1.5 animate-pulse rounded-full bg-ink-3" style={{ animationDelay: `${d * 150}ms` }} />)}</span></li>}
