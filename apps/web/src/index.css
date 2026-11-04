@@ -124,3 +124,6 @@ input, select, textarea { font-size: 16px; } /* 16px evita el zoom automático d
 /* Áreas seguras de iOS */
 .pt-safe { padding-top: max(0.75rem, env(safe-area-inset-top)); }
 .pb-safe { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+
+/* Teclado abierto en el chat: la barra inferior se oculta para que no suba con él. */
+.kb-open nav[aria-label="Principal"] { display: none; }
