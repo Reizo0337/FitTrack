@@ -50,7 +50,7 @@ export function Pantry() {
               <ul className="mt-4 flex flex-wrap gap-2">
                 {pantry.data?.items.map((p) => (
                   <li key={p.id} className="flex min-h-11 items-center gap-1 rounded-full bg-surface-2 pl-3 pr-1 text-sm">{p.name}
-                    <button className="inline-flex size-10 items-center justify-center rounded-full text-ink-2 hover:bg-line" aria-label={`Quitar ${p.name}`} onClick={async () => { await api(`/pantry/${p.id}`, { method: 'DELETE' }); pantry.reload(); shop.reload(); }}><X className="size-4" aria-hidden /></button></li>
+                    <button className="-mr-1 inline-flex size-11 items-center justify-center rounded-full text-ink-2 hover:bg-line" aria-label={`Quitar ${p.name}`} onClick={async () => { await api(`/pantry/${p.id}`, { method: 'DELETE' }); pantry.reload(); shop.reload(); }}><X className="size-4" aria-hidden /></button></li>
                 ))}
                 {!pantry.data?.items.length && <li className="t-meta">Vacía.</li>}
               </ul>
@@ -77,7 +77,7 @@ export function Pantry() {
                     <label className="flex min-h-12 items-center gap-3 text-sm"><input type="checkbox" className="size-5 accent-[var(--accent)]" checked={!!checked[i.name]} onChange={() => toggle(i.name)} />
                       <span className={cx('flex-1', checked[i.name] && 'text-ink-3 line-through')}>{i.name}</span><span className="num t-meta">{fmt(i.grams)}</span></label>
                   </li>))}</ul>
-                {have.length > 0 && <details className="mt-2"><summary className="min-h-9 cursor-pointer py-1.5 text-sm font-medium text-ink-2">Ya en tu despensa ({have.length})</summary>
+                {have.length > 0 && <details className="mt-2"><summary className="min-h-11 cursor-pointer py-2.5 text-sm font-medium text-ink-2">Ya en tu despensa ({have.length})</summary>
                   <ul className="t-meta mt-1">{have.map((i) => <li key={i.name} className="flex justify-between py-1"><span>{i.name}</span><span className="num">{fmt(i.grams)}</span></li>)}</ul></details>}
                 <Button variant="secondary" icon={Copy} block className="mt-4" onClick={copy} disabled={!toBuy.length}>Copiar lista</Button>
                 <div className="mt-3"><Notice tone="info">Cantidades aproximadas del menú. Las casillas se guardan solo en este dispositivo.</Notice></div>

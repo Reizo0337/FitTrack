@@ -45,7 +45,7 @@ export function FoodItem({ e, onEdit, onDelete }: { e: Entry; onEdit?: () => voi
         <span className="t-meta num block">{e.grams} g · P {e.nutrients.protein} · C {e.nutrients.carbs} · G {e.nutrients.fat}{t ? ` · ${t}` : ''}</span>
       </button>
       <span className="num w-12 text-right text-[0.9375rem] font-semibold">{kcal(e.nutrients.kcal)}</span>
-      {onDelete && <IconButton icon={Trash2} label={`Eliminar ${e.name}`} onClick={onDelete} className="!size-10" />}
+      {onDelete && <IconButton icon={Trash2} label={`Eliminar ${e.name}`} onClick={onDelete} className="!size-11" />}
     </li>
   );
 }

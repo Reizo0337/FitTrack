@@ -23,7 +23,7 @@ const components: Components = {
     ? <code className={className}>{children}</code> // bloque con lenguaje (dentro de <pre>)
     : <code className="rounded-md bg-surface-2 px-1.5 py-0.5 text-[0.85em]">{children}</code>,
   pre: ({ children }) => <pre className="mt-2 overflow-x-auto rounded-ctl bg-surface-2 p-3 text-xs [&_code]:bg-transparent [&_code]:p-0">{children}</pre>,
-  table: ({ children }) => <div className="mt-2 overflow-x-auto"><table className="w-full min-w-[16rem] text-sm">{children}</table></div>,
+  table: ({ children }) => <div className="mt-2 overflow-x-auto"><table className="w-full text-sm">{children}</table></div>,
   th: ({ children }) => <th className="border-b border-line-strong px-2 py-1.5 text-left font-semibold">{children}</th>,
   td: ({ children }) => <td className="border-b border-line px-2 py-1.5 align-top">{children}</td>,
 };

@@ -26,4 +26,4 @@ export const Estimate = () => <Badge tone="warn">estimado</Badge>;
 
 /** Chip seleccionable (categorías, sugerencias). */
 export const chipClass = (on: boolean) =>
-  `min-h-10 rounded-full border px-3.5 text-sm transition active:scale-[.98] ${on ? 'border-accent bg-accent-soft font-medium text-accent-strong' : 'border-line-strong bg-surface hover:bg-surface-2'}`;
+  `min-h-11 rounded-full border px-3.5 text-sm transition active:scale-[.98] ${on ? 'border-accent bg-accent-soft font-medium text-accent-strong' : 'border-line-strong bg-surface hover:bg-surface-2'}`;

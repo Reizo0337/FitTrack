@@ -45,7 +45,7 @@ export function MenuTab() {
         <>
           <div className="flex items-center justify-between gap-3 px-1">
             <p className="t-meta">{data.createdAt ? `Generado el ${new Date(data.createdAt).toLocaleString('es')} · ` : ''}valores aproximados</p>
-            <Link to="/pantry" className="inline-flex min-h-9 items-center gap-1.5 text-sm font-medium text-accent-strong"><ShoppingBasket className="size-4" aria-hidden />Lista de la compra</Link>
+            <Link to="/pantry" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-accent-strong"><ShoppingBasket className="size-4" aria-hidden />Lista de la compra</Link>
           </div>
           {(data.warnings ?? []).map((w) => <Notice key={w} tone="warn">{w}</Notice>)}
           {data.menu.days.map((d) => {

@@ -180,11 +180,11 @@ function Health() {
         <li><i>Obtener contenido de URL</i>: POST a <code className="break-all text-ink">{url}</code> con la cabecera <code className="text-ink">Authorization: Bearer &lt;token&gt;</code> y un cuerpo JSON.</li>
         <li>Automatización «Hora del día» (p. ej. 23:30) que ejecute el Atajo.</li>
       </ol>
-      <details><summary className="min-h-9 cursor-pointer py-1.5 text-sm font-medium text-ink-2">Ejemplo de cuerpo JSON</summary>
+      <details><summary className="min-h-11 cursor-pointer py-2.5 text-sm font-medium text-ink-2">Ejemplo de cuerpo JSON</summary>
         <pre className="mt-1 overflow-x-auto rounded-ctl bg-surface-2 p-3 text-xs">{sample}</pre>
         <p className="t-meta mt-2">Todo es opcional: lo que no envíes queda sin dato (nunca se rellena con 0). Reenviar el mismo día actualiza sin duplicar.</p></details>
       <Notice tone="info">Limitación: las automatizaciones de Atajos corren a horas fijas y iOS puede pedir confirmación. No es sincronización en tiempo real.</Notice>
-      {fresh && <Notice tone="warn"><b>Copia el token ahora; no volverá a mostrarse:</b><code className="mt-1 block select-all break-all">{fresh}</code><button className="mt-2 min-h-9 text-xs font-medium underline" onClick={() => setFresh('')}>Ya lo he copiado</button></Notice>}
+      {fresh && <Notice tone="warn"><b>Copia el token ahora; no volverá a mostrarse:</b><code className="mt-1 block select-all break-all">{fresh}</code><button className="mt-2 min-h-11 text-xs font-medium underline" onClick={() => setFresh('')}>Ya lo he copiado</button></Notice>}
       <ul>{toks.map((t) => (
         <li key={t.id} className="flex min-h-14 items-center justify-between gap-3 border-t border-line first:border-0">
           <span><span className="font-medium">{t.label}</span><span className="t-meta block">{t.lastUsedAt ? `Último uso: ${new Date(t.lastUsedAt).toLocaleString('es')}` : 'Sin usar todavía'}</span></span>
@@ -244,7 +244,7 @@ function Notifications() {
             <label className="flex flex-1 items-center gap-3 text-sm"><input type="checkbox" className="size-5 accent-[var(--accent)]" checked={r.enabled} onChange={(e) => upd(r.kind, { enabled: e.target.checked })} />{KIND_LABEL[r.kind] ?? r.kind}</label>
             <input type="time" value={r.timeLocal} onChange={(e) => upd(r.kind, { timeLocal: e.target.value })} aria-label={`Hora: ${KIND_LABEL[r.kind] ?? r.kind}`} className="min-h-11 rounded-ctl border border-line-strong bg-surface px-2 text-base" />
           </div>
-          {r.enabled && <div className="mt-2 flex flex-wrap gap-1.5 pl-0 sm:pl-8">{DAYS.map((d, i) => { const on = r.weekdays.includes(i + 1); return <button key={d} type="button" aria-pressed={on} aria-label={['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'][i]} className={cx('size-9 rounded-full text-xs font-semibold transition', on ? 'bg-accent text-accent-ink' : 'bg-surface-2 text-ink-2')} onClick={() => { const w = on ? r.weekdays.filter((x) => x !== i + 1) : [...r.weekdays, i + 1].sort(); if (w.length) upd(r.kind, { weekdays: w }); }}>{d}</button>; })}</div>}
+          {r.enabled && <div className="mt-2 flex flex-wrap gap-1.5 pl-0 sm:pl-8">{DAYS.map((d, i) => { const on = r.weekdays.includes(i + 1); return <button key={d} type="button" aria-pressed={on} aria-label={['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'][i]} className={cx('size-10 rounded-full text-xs font-semibold transition', on ? 'bg-accent text-accent-ink' : 'bg-surface-2 text-ink-2')} onClick={() => { const w = on ? r.weekdays.filter((x) => x !== i + 1) : [...r.weekdays, i + 1].sort(); if (w.length) upd(r.kind, { weekdays: w }); }}>{d}</button>; })}</div>}
         </li>))}</ul>
       <p className="t-meta">«Avisarme si llevo horas sin moverme» no es posible: requiere movimiento en tiempo real.</p>
       <Button variant="secondary" onClick={async () => { await api('/reminders', { method: 'PUT', body: JSON.stringify({ items }) }); toast('Recordatorios guardados'); }}>Guardar recordatorios</Button>

@@ -76,7 +76,7 @@ export function Photos() {
               <li key={p.id} className="relative">
                 <Img id={p.id} alt={`Foto del ${fmt(p.date)}`} />
                 <span className="t-meta mt-1 block text-center">{fmt(p.date)}</span>
-                <IconButton icon={Trash2} label={`Borrar foto del ${fmt(p.date)}`} className="absolute right-0.5 top-0.5 !size-9 bg-surface/85 backdrop-blur-sm" onClick={() => setDeleting(p)} />
+                <IconButton icon={Trash2} label={`Borrar foto del ${fmt(p.date)}`} className="absolute right-0.5 top-0.5 !size-11 bg-surface/85 backdrop-blur-sm" onClick={() => setDeleting(p)} />
               </li>
             ))}
           </ul>

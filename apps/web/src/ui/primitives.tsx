@@ -28,7 +28,7 @@ export const Button = forwardRef<HTMLButtonElement, BtnProps>(function Button(
       onClick={(e) => { haptic(); onClick?.(e); }}
       className={cx(
         'inline-flex items-center justify-center gap-2 rounded-ctl font-semibold transition active:scale-[.98] disabled:opacity-50 disabled:active:scale-100',
-        size === 'md' ? 'min-h-11 px-4 text-[0.9375rem]' : 'min-h-10 px-3 text-sm',
+        size === 'md' ? 'min-h-11 px-4 text-[0.9375rem]' : 'min-h-11 px-3 text-sm lg:min-h-10',
         variants[variant], block && 'w-full', className,
       )}
       {...rest}
@@ -105,7 +105,7 @@ export function Segmented<T extends string | number>({ value, onChange, options,
     <div role="tablist" aria-label={label} className={cx('rounded-ctl bg-surface-2 p-1', block ? 'flex w-full' : 'inline-flex', className)}>
       {options.map((o) => (
         <button key={String(o.value)} role="tab" aria-selected={o.value === value} onClick={() => onChange(o.value)}
-          className={cx('min-h-9 rounded-[9px] px-3 text-sm font-medium transition', block && 'flex-1 text-center', o.value === value ? 'bg-surface text-ink shadow-[var(--shadow)]' : 'text-ink-2 hover:text-ink')}>{o.label}</button>
+          className={cx('min-h-10 rounded-[9px] px-3 text-sm font-medium transition lg:min-h-9', block && 'flex-1 text-center', o.value === value ? 'bg-surface text-ink shadow-[var(--shadow)]' : 'text-ink-2 hover:text-ink')}>{o.label}</button>
       ))}
     </div>
   );

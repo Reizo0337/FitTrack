@@ -1,5 +1,5 @@
 import { ArrowUp, BarChart3, ChefHat, ChevronLeft, ClipboardList, KeyRound, Mic, MicOff, Sparkles, Square, UtensilsCrossed, Volume2, VolumeX, type LucideIcon } from 'lucide-react';
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { EatTab } from '../components/ai/EatTab';
@@ -12,6 +12,7 @@ import { PageHeader } from '../components/PageHeader';
 import { todayStr } from '../ctx';
 import { useData } from '../hooks';
 import { plainSpeech, useDictation, useSpeaker } from '../voice';
+import { useToast } from '../ui/overlays';
 import { Button, Card, EmptyState, ErrorState, IconButton, LoadingState, Notice, cx } from '../ui/primitives';
 
 type Msg = { role: 'user' | 'assistant'; content: string; error?: boolean };
@@ -94,11 +95,23 @@ function ChatTab({ usage }: { usage: { calls: number; limit: number } }) {
   const baseText = useRef('');
   const scroller = useRef<HTMLDivElement>(null);
   const [tool, setTool] = useState<Tool | null>(null);
+  const toast = useToast();
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const prevTool = useRef<Tool | null>(null);
   const vp = useChatViewport();
   const speaker = useSpeaker();
   const voiceRef = useRef(voiceMode);
   voiceRef.current = voiceMode;
   useEffect(() => { if (msgs.length) scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' }); }, [msgs, busy, vp.kb]);
+  // El cuadro de texto crece con lo que escribes (hasta 8 rem) para que siempre veas tu mensaje.
+  useLayoutEffect(() => { const el = taRef.current; if (!el) return; if (!text) { el.style.height = ''; return; } el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight, 128)}px`; }, [text, tool]);
+  // Foco: al abrir una función va a su título; al volver, al botón que la abrió (no se pierde la posición con teclado o lector de pantalla).
+  useEffect(() => {
+    if (tool) headingRef.current?.focus();
+    else if (prevTool.current) document.querySelector<HTMLElement>(`[data-tool="${prevTool.current}"]`)?.focus();
+    prevTool.current = tool;
+  }, [tool]);
 
   async function send(message: string) {
     const m = message.trim();
@@ -133,6 +146,7 @@ function ChatTab({ usage }: { usage: { calls: number; limit: number } }) {
     setVoiceMode(on);
     try { localStorage.setItem('voiceMode', on ? '1' : '0'); } catch { /* sin almacenamiento */ }
     if (on) speaker.unlock(); else speaker.stop();
+    toast(on ? 'Modo voz activado: se envía al terminar de hablar y se lee la respuesta. El audio lo procesa el servicio de voz de tu navegador.' : 'Modo voz desactivado', 'info');
   }
 
   const style = { '--vv-top': `${vp.top}px`, '--vv-h': `${vp.height}px`, '--nav-h': vp.kb ? '0px' : 'calc(3.25rem + env(safe-area-inset-bottom))' } as CSSProperties;
@@ -141,15 +155,15 @@ function ChatTab({ usage }: { usage: { calls: number; limit: number } }) {
   return (
     <div style={style} className="max-lg:fixed max-lg:inset-x-0 max-lg:top-[var(--vv-top)] max-lg:z-20 max-lg:h-[calc(var(--vv-h)-var(--nav-h))] max-lg:bg-bg max-lg:px-4 lg:h-[calc(100dvh-4rem)]">
       <div className="mx-auto flex h-full max-w-2xl flex-col">
-        <header className="flex shrink-0 items-center justify-between gap-2 pb-2 max-lg:pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <header className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-line pb-2 max-lg:pt-[max(0.5rem,env(safe-area-inset-top))]">
           {active ? (
-            <button onClick={() => setTool(null)} className="-ml-2 inline-flex min-h-11 items-center gap-1 px-2 text-sm font-medium text-accent-strong"><ChevronLeft className="size-5" aria-hidden />Chat</button>
+            <button onClick={() => setTool(null)} aria-label="Volver al chat" className="-ml-2 inline-flex min-h-11 min-w-11 items-center gap-1 rounded-ctl px-2 text-sm font-medium text-accent-strong"><ChevronLeft className="size-5" aria-hidden />Chat</button>
           ) : <h1 className="t-title">Asistente nutricional</h1>}
-          {active && <h1 className="t-head">{active.label}</h1>}
+          {active && <h1 ref={headingRef} tabIndex={-1} className="t-head outline-none">{active.label}</h1>}
           {active && <span className="w-16" aria-hidden />}
         </header>
 
-        <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-3" aria-live="polite">
+        <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-3">
           {active ? (
             <>
               {tool === 'log' && <LogTab />}
@@ -160,17 +174,17 @@ function ChatTab({ usage }: { usage: { calls: number; limit: number } }) {
           ) : msgs.length === 0 ? (
             <div className="pt-1">
               <div className="mb-4 flex items-start gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent-strong"><Sparkles className="size-[18px]" aria-hidden /></span>
-                <p className="t-body pt-1">Hola. Puedo consultar tus comidas, peso, actividad y sueño registrados para orientarte. No soy un médico: para temas de salud consulta a un profesional.{dictation.supported ? ' Puedes escribirme o hablarme con el micrófono.' : ''}</p></div>
+                <p className="t-body pt-1">Hola. Consulto tus comidas, peso, actividad y sueño para orientarte. No soy médico: ante dudas de salud, consulta a un profesional.</p></div>
               <p className="t-over mb-2">Funciones</p>
               <ul className="mb-4 grid grid-cols-2 gap-2">{TOOLS.map((t) => (
-                <li key={t.value}><button onClick={() => setTool(t.value)} className="flex min-h-[4.25rem] w-full items-center gap-3 rounded-ctl border border-line-strong bg-surface px-3 text-left transition hover:bg-surface-2 active:scale-[.98]">
+                <li key={t.value}><button data-tool={t.value} onClick={() => setTool(t.value)} className="flex min-h-[4.25rem] w-full items-center gap-3 rounded-ctl border border-line-strong bg-surface px-3 text-left transition hover:bg-surface-2 active:scale-[.98]">
                   <t.icon className="size-5 shrink-0 text-accent-strong" aria-hidden /><span><span className="block text-sm font-semibold">{t.label}</span><span className="t-meta block leading-tight">{t.hint}</span></span></button></li>
               ))}</ul>
               <p className="t-over mb-2">Prueba a preguntar</p>
               <ul className="flex flex-wrap gap-2">{SUGGESTIONS.map((s) => <li key={s}><button onClick={() => send(s)} className={chipClass(false)}>{s}</button></li>)}</ul>
             </div>
           ) : (
-            <ul className="flex flex-col gap-3">
+            <ul className="flex flex-col gap-3" role="log" aria-live="polite" aria-label="Conversación">
               {msgs.map((m, i) => (
                 <li key={i} className={cx('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
                   <div className={cx('min-w-0 max-w-[88%] rounded-[18px] [overflow-wrap:anywhere] px-4 py-2.5 text-[0.9375rem] leading-relaxed',
@@ -184,33 +198,32 @@ function ChatTab({ usage }: { usage: { calls: number; limit: number } }) {
           )}
         </div>
 
-      <div className={cx('shrink-0 bg-bg pb-2 pt-1', active && 'hidden')}>
-        {msgs.length > 0 && !vp.kb && <ul className="-mx-1 mb-2 flex gap-2 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{TOOLS.map((t) => <li key={t.value} className="shrink-0"><button onClick={() => setTool(t.value)} className={cx(chipClass(false), 'inline-flex items-center gap-1.5')}><t.icon className="size-4" aria-hidden />{t.label}</button></li>)}</ul>}
+      <div className={cx('shrink-0 border-t border-line bg-bg pb-2 pt-2', active && 'hidden')}>
+        {msgs.length > 0 && !vp.kb && (
+          <ul className="-mx-1 mb-2 flex gap-2 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [@media(max-height:520px)]:hidden" aria-label="Funciones">
+            {TOOLS.map((t) => <li key={t.value} className="shrink-0"><button data-tool={t.value} onClick={() => setTool(t.value)} className={cx(chipClass(false), 'inline-flex items-center gap-1.5')}><t.icon className="size-4" aria-hidden />{t.label}</button></li>)}
+          </ul>
+        )}
         {dictation.error && <div className="mb-2"><Notice tone="warn">{dictation.error}</Notice></div>}
         <form onSubmit={(e: FormEvent) => { e.preventDefault(); send(text); }} className="flex items-end gap-2">
-          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={1} maxLength={2000} aria-label="Mensaje"
-            placeholder={dictation.listening ? 'Escuchando… habla ahora' : 'Escribe tu pregunta…'}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(text); } }}
-            className="max-h-32 min-h-11 flex-1 resize-none text-base rounded-[22px] border border-line-strong bg-surface px-4 py-2.5 placeholder:text-ink-3 focus:border-accent focus:outline-none" />
+          <textarea ref={taRef} value={text} onChange={(e) => setText(e.target.value)} rows={1} maxLength={2000} aria-label="Mensaje"
+            enterKeyHint="send" autoComplete="off" autoCapitalize="sentences"
+            placeholder={dictation.listening ? 'Escuchando…' : 'Pregunta algo…'}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(text); } }}
+            className="max-h-32 min-h-11 min-w-0 flex-1 resize-none rounded-[22px] border border-line-strong bg-surface px-4 py-2.5 text-base placeholder:text-ink-3 focus:border-accent focus:outline-none" />
+          {dictation.supported && speaker.supported && (speaker.speaking
+            ? <IconButton type="button" icon={Square} label="Parar lectura" tone="accent" className="shrink-0 border border-accent bg-accent-soft" onClick={speaker.stop} />
+            : <IconButton type="button" icon={voiceMode ? Volume2 : VolumeX} label="Modo voz" aria-pressed={voiceMode} tone={voiceMode ? 'accent' : 'default'}
+                className={cx('shrink-0 border', voiceMode ? 'border-accent bg-accent-soft' : 'border-line-strong')} onClick={toggleVoiceMode} />)}
           {dictation.supported && (
             <IconButton type="button" icon={dictation.listening ? MicOff : Mic} label={dictation.listening ? 'Dejar de escuchar' : 'Hablar con el micrófono'} aria-pressed={dictation.listening}
-              tone={dictation.listening ? 'danger' : 'default'} className={cx('border border-line-strong', dictation.listening && 'animate-pulse')} onClick={toggleMic} />
+              tone={dictation.listening ? 'danger' : 'default'} className={cx('shrink-0 border border-line-strong', dictation.listening && 'animate-pulse')} onClick={toggleMic} />
           )}
-          <Button type="submit" aria-label="Enviar" disabled={!text.trim()} loading={busy} className="!size-11 !rounded-full !px-0" icon={ArrowUp} />
+          <Button type="submit" aria-label="Enviar" disabled={!text.trim()} loading={busy} onPointerDown={(e) => e.preventDefault()} className="!size-11 shrink-0 !rounded-full !px-0" icon={ArrowUp} />
         </form>
-        {(dictation.supported || speaker.supported) && !vp.kb && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {dictation.supported && speaker.supported && (
-              <Button variant={voiceMode ? 'primary' : 'secondary'} size="sm" icon={voiceMode ? Volume2 : VolumeX} aria-pressed={voiceMode} onClick={toggleVoiceMode}>Modo voz {voiceMode ? 'activado' : 'desactivado'}</Button>
-            )}
-            {speaker.speaking && <Button variant="ghost" size="sm" icon={Square} onClick={speaker.stop}>Parar lectura</Button>}
-            {dictation.listening && <span role="status" className="t-meta flex items-center gap-1.5"><i className="size-2 animate-pulse rounded-full bg-danger" aria-hidden />Escuchando…</span>}
-          </div>
-        )}
+        {dictation.listening && <p role="status" className="t-meta mt-2 flex items-center gap-1.5"><i className="size-2 animate-pulse rounded-full bg-danger" aria-hidden />Escuchando…</p>}
         {!dictation.supported && !vp.kb && <p className="t-meta mt-2">Este navegador no admite dictado por voz. En el iPhone puedes usar el micrófono del teclado.</p>}
-        {voiceMode && !vp.kb && <p className="t-meta mt-2 [@media(max-height:700px)]:hidden">Modo voz: al terminar de hablar se envía el mensaje y se lee la respuesta. El audio lo procesa el servicio de voz de tu navegador (Apple o Google).</p>}
-      </div>
-        {!vp.kb && <p className="t-meta pt-2 text-center [@media(max-height:700px)]:hidden">Orientación nutricional con estimaciones; no sustituye a un profesional sanitario. {usage.calls}/{usage.limit} consultas hoy.</p>}
+      </div>        {!vp.kb && <p className="t-meta pt-2 text-center [@media(max-height:700px)]:hidden">Orientación nutricional con estimaciones; no sustituye a un profesional sanitario. {usage.calls}/{usage.limit} consultas hoy.</p>}
       </div>
     </div>
   );

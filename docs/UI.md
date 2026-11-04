@@ -21,8 +21,20 @@ Tipografía: `t-display`, `t-title`, `t-head`, `t-body`, `t-meta`, `t-over`; cif
 | Cabecera de pantalla | `PageHeader` |
 | Datos de la API | `useData` (recarga sola cuando cambian los datos) |
 
+## Accesibilidad (se comprueba en `ui/contrast.test.ts`)
+- **Contraste**: todo par texto/fondo de los tokens cumple WCAG AA (≥ 4,5:1) en los dos temas. Si cambias un color de `index.css`, `npm test -w @fittrack/web` falla cuando deja de cumplirse. `--ink-3` es solo para texto secundario/marcadores y también cumple.
+- **Lectores de pantalla**: una región `aria-live` solo envuelve contenido que se va añadiendo (la conversación del chat es un `role="log"`); nunca un contenedor entero de formularios.
+- **Foco**: al abrir una vista dentro de otra el foco va a su título (`tabIndex={-1}`); al cerrarla vuelve al control que la abrió. Los diálogos usan `Sheet`, que atrapa el foco y cierra con `Esc`.
+- Los botones con estado (modo voz, micrófono) mantienen una **etiqueta fija** y expresan el estado con `aria-pressed`.
+- Toda entrada de texto tiene etiqueta (`FormField`/`aria-label`); un solo `h1` por pantalla y sin saltos de nivel.
+
+## Móvil
+- Entradas a 16 px (evita el zoom automático de iOS). El chat sigue el viewport visual y oculta la barra inferior con el teclado abierto.
+- Tras enviar un mensaje el foco se queda en el cuadro de texto (el teclado no se cierra); el cuadro crece con lo que escribes hasta 8 rem.
+- Probar siempre en un móvil pequeño y bajo (≈ 360 × 560): ninguna pantalla debe desbordar en horizontal.
+
 ## Reglas
-- Zonas táctiles ≥ 44 px (`min-h-11`), también en enlaces de texto.
+- Zonas táctiles ≥ 44 px (`min-h-11`), también en enlaces de texto, botones `sm` (en móvil), iconos y `summary`. Excepción: grupos densos de opciones (`Segmented`, días de la semana) ≥ 40 px con separación.
 - Sin colores ni tamaños sueltos (`slate-*`, `#hex`, `dark:`): se usan los tokens.
 - Los iconos son de `lucide-react`; sin emojis como iconos.
 - «Sin dato» se muestra como tal (no como 0); las estimaciones llevan `Badge`/`Notice` de aviso.

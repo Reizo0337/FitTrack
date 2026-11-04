@@ -34,7 +34,7 @@ export function WeightSheet({ open, onClose }: { open: boolean; onClose: () => v
           <FormField label="Fecha" name="date" type="date" defaultValue={todayStr()} max={todayStr()} required />
         </div>
         <details className="rounded-ctl border border-line bg-surface px-3 py-2">
-          <summary className="min-h-9 cursor-pointer py-1.5 text-sm font-medium text-ink-2">Composición corporal (opcional)</summary>
+          <summary className="min-h-11 cursor-pointer py-2.5 text-sm font-medium text-ink-2">Composición corporal (opcional)</summary>
           <div className="grid grid-cols-2 gap-3 pb-2 pt-2">
             <FormField label="% grasa" name="bodyFatPct" inputMode="decimal" />
             <FormField label="Músculo (kg)" name="muscleKg" inputMode="decimal" />

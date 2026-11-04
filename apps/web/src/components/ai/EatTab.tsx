@@ -62,7 +62,7 @@ export function EatTab() {
               <p className="num t-body">≈ <b>{Math.round(o.kcal)} kcal</b> · P {Math.round(o.protein)} · C {Math.round(o.carbs)} · G {Math.round(o.fat)} · fibra {Math.round(o.fiber)}</p>
               {o.exceedsRemainingKcal && <Notice tone="warn">Supera las calorías que te quedan hoy.</Notice>}
               <ul className="list-disc pl-5 text-sm text-ink-2">{o.ingredients.map((i) => <li key={i.name}>{i.name} — {Math.round(i.grams)} g</li>)}</ul>
-              {o.steps.length > 0 && <details><summary className="min-h-9 cursor-pointer py-1.5 text-sm font-medium text-ink-2">Instrucciones</summary><ol className="mt-1 list-decimal pl-5 text-sm text-ink-2">{o.steps.map((s, k) => <li key={k}>{s}</li>)}</ol></details>}
+              {o.steps.length > 0 && <details><summary className="min-h-11 cursor-pointer py-2.5 text-sm font-medium text-ink-2">Instrucciones</summary><ol className="mt-1 list-decimal pl-5 text-sm text-ink-2">{o.steps.map((s, k) => <li key={k}>{s}</li>)}</ol></details>}
               <Button variant="secondary" block onClick={() => log(o)}>Registrar esto</Button>
             </Card>
           ))}
