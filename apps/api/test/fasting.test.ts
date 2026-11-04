@@ -23,12 +23,12 @@ describe('ayuno', () => {
     const r = await app.inject({ method: 'GET', url: '/api/fasting', headers: auth });
     expect(r.statusCode).toBe(200);
     expect(r.json().config).toMatchObject({ enabled: true, breakfastTime: '08:00', dinnerTime: '21:00' });
-    expect(r.json().gaps).toHaveLength(4);
+    expect(r.json().gaps).toHaveLength(3);
     expect(['waiting', 'fasting', 'done']).toContain(r.json().status.state);
     expect(r.json().status.kcalPerHour).toBeGreaterThan(0);
   });
   it('guarda los horarios, los valida y permite desactivarlo', async () => {
-    const cfg = { enabled: true, breakfastTime: '07:30', lunchTime: '13:00', snackTime: '17:00', dinnerTime: '20:30' };
+    const cfg = { enabled: true, breakfastTime: '07:30', lunchTime: '13:00', dinnerTime: '20:30' };
     const ok = await app.inject({ method: 'PUT', url: '/api/fasting', headers: auth, payload: cfg });
     expect(ok.json().config).toEqual(cfg);
     expect((await app.inject({ method: 'PUT', url: '/api/fasting', headers: auth, payload: { ...cfg, dinnerTime: '25:99' } })).statusCode).toBe(400);

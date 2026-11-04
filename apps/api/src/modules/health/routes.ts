@@ -26,11 +26,36 @@ export const healthRoutes: FastifyPluginAsync = async (app) => {
 
   // --- Importación desde Atajos de iOS: autenticada SOLO con un token de ingesta (no sirve para leer datos) ---
   app.post('/ingest', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } }, bodyLimit: 500_000 }, async (req, reply) => {
-    const raw = /^Bearer (ftk_[\w-]+)$/.exec(req.headers.authorization ?? '')?.[1];
+    const auth = (req.headers.authorization ?? '').trim();
+    const raw = /^Bearer\s+(ftk_[\w-]+)$/i.exec(auth)?.[1];
     const tok = raw ? await db.ingestToken.findUnique({ where: { tokenHash: sha256(raw) } }) : null;
     if (!tok || tok.revokedAt) return reply.code(401).send({ error: 'INVALID_INGEST_TOKEN' });
     const userId = tok.userId;
-    const b = healthIngestSchema.parse(req.body);
+    let rawBody = req.body;
+    if (typeof rawBody === 'string') {
+      try { rawBody = JSON.parse(rawBody); } catch { /* ignore */ }
+    }
+    if (rawBody && typeof rawBody === 'object') {
+      const p = { ...(rawBody as Record<string, unknown>) };
+      if (p.days && !Array.isArray(p.days) && typeof p.days === 'object') {
+        p.days = [p.days];
+      }
+      const hasRootMetrics = 'date' in p || 'steps' in p || 'activeKcal' in p || 'restingKcal' in p || 'distanceKm' in p;
+      if ((!p.days || (Array.isArray(p.days) && p.days.length === 0)) && hasRootMetrics) {
+        const { date, steps, activeKcal, restingKcal, distanceKm, exerciseMin, avgHeartRate, restingHeartRate } = p;
+        p.days = [{ date: (date as string) ?? new Date().toISOString().slice(0, 10), steps, activeKcal, restingKcal, distanceKm, exerciseMin, avgHeartRate, restingHeartRate }];
+      }
+      if (Array.isArray(p.days)) {
+        p.days = p.days.map((item) => {
+          if (item && typeof item === 'object' && !('date' in item)) {
+            return { date: new Date().toISOString().slice(0, 10), ...item };
+          }
+          return item;
+        });
+      }
+      rawBody = p;
+    }
+    const b = healthIngestSchema.parse(rawBody);
     const profile = await db.userProfile.findUniqueOrThrow({ where: { userId } });
     const r = { applied: 0, skipped: 0 };
     const count = (ok: boolean) => (ok ? r.applied++ : r.skipped++);

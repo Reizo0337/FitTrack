@@ -63,9 +63,9 @@ export function LogTab() {
             <IconButton icon={X} label={`Quitar ${it.name}`} onClick={() => setItems((xs) => xs!.filter((_, k) => k !== i))} /></div>
           {it.assumption && <p className="t-meta">Suposición: {it.assumption} · confianza {it.confidence}</p>}
           {it.inconsistent && <Notice tone="warn">Las calorías no cuadran con los macros; revísalo.</Notice>}
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <FormField label="Gramos" inputMode="decimal" value={it.grams} onChange={(e) => regram(i, n(e.target.value))} />
-            {FIELDS.map(([k, l]) => <FormField key={k} label={l} inputMode="decimal" value={it[k]} onChange={(e) => upd(i, { [k]: n(e.target.value) })} />)}
+            {FIELDS.map(([k, l], idx) => <FormField key={k} label={l} inputMode="decimal" value={it[k]} onChange={(e) => upd(i, { [k]: n(e.target.value) })} className={idx === FIELDS.length - 1 ? 'col-span-2 sm:col-span-1' : undefined} />)}
           </div>
         </Card>
       ))}

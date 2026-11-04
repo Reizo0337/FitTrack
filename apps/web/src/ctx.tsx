@@ -8,7 +8,7 @@ import { shiftDate, todayStr } from './ui/DateSelector';
 export { shiftDate, todayStr };
 export const defaultMeal = (): MealTypeId => {
   const h = new Date().getHours();
-  return h < 11 ? 'BREAKFAST' : h < 16 ? 'LUNCH' : h < 19 ? 'AFTERNOON_SNACK' : h < 23 ? 'DINNER' : 'SNACKS';
+  return h < 11 ? 'BREAKFAST' : h < 16 ? 'LUNCH' : h < 19 ? 'SNACKS' : h < 23 ? 'DINNER' : 'SNACKS';
 };
 
 type AddInit = { type?: MealTypeId; tab?: 'search' | 'scan' | 'create' };

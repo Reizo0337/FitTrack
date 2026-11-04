@@ -2,10 +2,10 @@ import { z } from 'zod';
 import { type Nutrients } from './nutrition';
 import { localDate } from './schemas';
 
-export const MEAL_TYPES = ['BREAKFAST', 'LUNCH', 'AFTERNOON_SNACK', 'DINNER', 'SNACKS'] as const;
+export const MEAL_TYPES = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACKS'] as const;
 export type MealTypeId = (typeof MEAL_TYPES)[number];
 export const MEAL_LABELS: Record<MealTypeId, string> = {
-  BREAKFAST: 'Desayuno', LUNCH: 'Comida', AFTERNOON_SNACK: 'Merienda', DINNER: 'Cena', SNACKS: 'Snacks',
+  BREAKFAST: 'Desayuno', LUNCH: 'Comida', DINNER: 'Cena', SNACKS: 'Snacks',
 };
 
 const g100 = z.number().min(0).max(100);

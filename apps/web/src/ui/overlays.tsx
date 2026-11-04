@@ -37,7 +37,7 @@ export function Sheet({ open, onClose, title, children, size = 'md' }: { open: b
           <h2 className="t-title">{title}</h2>
           <IconButton icon={X} label="Cerrar" onClick={onClose} />
         </header>
-        <div className="overflow-y-auto px-4 pb-safe pt-2">{children}</div>
+        <div className="overflow-y-auto overscroll-contain px-4 pb-safe pt-2">{children}</div>
       </div>
     </div>
   );

@@ -63,8 +63,9 @@ function Shell({ onLogout }: { onLogout: () => void }) {
   return (
     <div className="min-h-dvh lg:pl-60">
       <Sidebar onQuickAdd={openQuick} />
-      <main className="mx-auto w-full max-w-xl px-4 pb-28 pt-safe lg:max-w-5xl lg:px-10 lg:pb-12 lg:pt-8">
-        <div key={pathname} className="page-in">
+      <main className="mx-auto w-full max-w-xl px-4 pt-safe lg:max-w-5xl lg:px-10 lg:pb-12 lg:pt-8" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 7rem)' }}>
+        {/* El chat usa position:fixed: su página solo puede animar opacidad (un transform lo descolocaría) */}
+        <div key={pathname} className={chat ? 'fade-in' : 'page-in'}>
           <Suspense fallback={<LoadingState rows={2} />}>
           <Routes>
             <Route path="/" element={<Home />} />

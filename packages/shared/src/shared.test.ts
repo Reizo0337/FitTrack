@@ -142,6 +142,6 @@ describe('ayuno', () => {
   });
   it('calcula las horas entre comidas', () => {
     const g = mealGaps(DEFAULT_FASTING);
-    expect(g.map((x) => x.hours)).toEqual([6, 3.5, 3.5, 11]);
+    expect(g.map((x) => x.hours)).toEqual([6, 7, 11]);
   });
 });

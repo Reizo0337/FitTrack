@@ -193,7 +193,7 @@ describe('recomendaciones, restricciones y caché', () => {
 
 describe('menú semanal', () => {
   const meal = (type: string, o: object = {}) => ({ type, title: 'Plato', minutes: 15, ingredients: [{ name: 'Pollo', grams: 150 }], kcal: 500, protein: 40, carbs: 40, fat: 15, fiber: 6, ...o });
-  const day = (name: string, extra: object = {}) => ({ day: name, meals: [meal('BREAKFAST'), meal('LUNCH'), meal('AFTERNOON_SNACK', { kcal: 300 }), meal('DINNER', extra)] });
+  const day = (name: string, extra: object = {}) => ({ day: name, meals: [meal('BREAKFAST'), meal('LUNCH'), meal('SNACKS', { kcal: 300 }), meal('DINNER', extra)] });
   const week = (bad?: object) => ({ days: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map((d, i) => day(d, i === 2 && bad ? bad : {})) });
 
   it('reintenta una vez si el menú contiene un alimento excluido y guarda el resultado limpio', async () => {

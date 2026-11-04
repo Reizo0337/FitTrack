@@ -167,7 +167,7 @@ function ActivitySheet({ kind, onClose }: { kind: 'sleep' | 'activity' | null; o
         <FormField label={kind === 'sleep' ? 'Día en que te despiertas' : 'Fecha'} name="date" type="date" defaultValue={today} max={today} required />
         {kind === 'sleep' ? (
           <>
-            <div className="grid grid-cols-3 gap-3"><FormField label="Me acosté" name="bed" type="time" /><FormField label="Me dormí" name="sleep" type="time" /><FormField label="Me desperté" name="wake" type="time" /></div>
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3"><FormField label="Me acosté" name="bed" type="time" /><FormField label="Me dormí" name="sleep" type="time" /><FormField label="Me desperté" name="wake" type="time" /></div>
             <FormField label="…o solo la duración (h)" name="hours" inputMode="decimal" placeholder="7,5" />
             <div className="grid grid-cols-2 gap-3">
               <SelectField label="Calidad" name="quality" defaultValue=""><option value="">—</option>{[1, 2, 3, 4, 5].map((q) => <option key={q}>{q}</option>)}</SelectField>

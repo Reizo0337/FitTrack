@@ -28,7 +28,7 @@ export const Button = forwardRef<HTMLButtonElement, BtnProps>(function Button(
       onClick={(e) => { haptic(); onClick?.(e); }}
       className={cx(
         'inline-flex items-center justify-center gap-2 rounded-ctl font-semibold transition active:scale-[.98] disabled:opacity-50 disabled:active:scale-100',
-        size === 'md' ? 'min-h-11 px-4 text-[0.9375rem]' : 'min-h-9 px-3 text-sm',
+        size === 'md' ? 'min-h-11 px-4 text-[0.9375rem]' : 'min-h-10 px-3 text-sm',
         variants[variant], block && 'w-full', className,
       )}
       {...rest}
@@ -85,7 +85,7 @@ export const TextAreaField = forwardRef<HTMLTextAreaElement, FieldProps & Textar
       <label htmlFor={id} className="mb-1 block text-[0.8125rem] font-medium text-ink-2">{label}</label>
       <textarea id={id} ref={ref} aria-invalid={!!error || undefined} aria-describedby={error || hint ? `${id}-d` : undefined}
         className={cx('min-h-24 w-full resize-y rounded-ctl border bg-surface px-3 py-2.5 text-ink placeholder:text-ink-3 transition focus:border-accent focus:outline-none disabled:opacity-50', error ? 'border-danger' : 'border-line-strong')} {...rest} />
-      {(error || hint) && <p id={`-d`} className={cx('mt-1 text-xs', error ? 'text-danger' : 'text-ink-3')}>{error ?? hint}</p>}
+      {(error || hint) && <p id={`${id}-d`} className={cx('mt-1 text-xs', error ? 'text-danger' : 'text-ink-3')}>{error ?? hint}</p>}
     </div>
   );
 });
@@ -100,12 +100,12 @@ export function SelectField({ label, className, children, ...rest }: { label: st
   );
 }
 
-export function Segmented<T extends string | number>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; label: string }) {
+export function Segmented<T extends string | number>({ value, onChange, options, label, className, block }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; label: string; className?: string; block?: boolean }) {
   return (
-    <div role="tablist" aria-label={label} className="inline-flex rounded-ctl bg-surface-2 p-1">
+    <div role="tablist" aria-label={label} className={cx('rounded-ctl bg-surface-2 p-1', block ? 'flex w-full' : 'inline-flex', className)}>
       {options.map((o) => (
         <button key={String(o.value)} role="tab" aria-selected={o.value === value} onClick={() => onChange(o.value)}
-          className={cx('min-h-9 rounded-[9px] px-3 text-sm font-medium transition', o.value === value ? 'bg-surface text-ink shadow-[var(--shadow)]' : 'text-ink-2 hover:text-ink')}>{o.label}</button>
+          className={cx('min-h-9 rounded-[9px] px-3 text-sm font-medium transition', block && 'flex-1 text-center', o.value === value ? 'bg-surface text-ink shadow-[var(--shadow)]' : 'text-ink-2 hover:text-ink')}>{o.label}</button>
       ))}
     </div>
   );

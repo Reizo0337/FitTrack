@@ -14,7 +14,7 @@ export const fastingRoutes: FastifyPluginAsync = async (app) => {
       db.weightEntry.findFirst({ where: { userId }, orderBy: { measuredAt: 'desc' } }),
     ]);
     const cfg = stored
-      ? { enabled: stored.enabled, breakfastTime: stored.breakfastTime, lunchTime: stored.lunchTime, snackTime: stored.snackTime, dinnerTime: stored.dinnerTime }
+      ? { enabled: stored.enabled, breakfastTime: stored.breakfastTime, lunchTime: stored.lunchTime, dinnerTime: stored.dinnerTime }
       : DEFAULT_FASTING;
     const now = new Date();
     const today = localDateIn(now, profile.timezone);

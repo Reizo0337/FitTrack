@@ -136,8 +136,8 @@ function AISettings() {
       </ul>
       <div className="flex flex-col gap-3 border-t border-line pt-4">
         {tasks.map((t) => (
-          <div key={t.task} className="grid grid-cols-[1fr_1fr] gap-2">
-            <p className="col-span-2 text-sm font-medium">{TASK[t.task]}</p>
+          <div key={t.task} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <p className="text-sm font-medium sm:col-span-2">{TASK[t.task]}</p>
             <SelectField label="Proveedor" value={t.provider} onChange={(e) => upd(t.task, { provider: e.target.value, model: data.defaults[e.target.value]?.[t.task] ?? t.model })}>{Object.entries(PROV).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</SelectField>
             <FormField label="Modelo" value={t.model} onChange={(e) => upd(t.task, { model: e.target.value })} />
           </div>
@@ -242,9 +242,9 @@ function Notifications() {
         <li key={r.kind} className="border-t border-line py-3 first:border-0">
           <div className="flex min-h-11 items-center justify-between gap-3">
             <label className="flex flex-1 items-center gap-3 text-sm"><input type="checkbox" className="size-5 accent-[var(--accent)]" checked={r.enabled} onChange={(e) => upd(r.kind, { enabled: e.target.checked })} />{KIND_LABEL[r.kind] ?? r.kind}</label>
-            <input type="time" value={r.timeLocal} onChange={(e) => upd(r.kind, { timeLocal: e.target.value })} aria-label={`Hora: ${KIND_LABEL[r.kind] ?? r.kind}`} className="min-h-10 rounded-ctl border border-line-strong bg-surface px-2 text-sm" />
+            <input type="time" value={r.timeLocal} onChange={(e) => upd(r.kind, { timeLocal: e.target.value })} aria-label={`Hora: ${KIND_LABEL[r.kind] ?? r.kind}`} className="min-h-11 rounded-ctl border border-line-strong bg-surface px-2 text-base" />
           </div>
-          {r.enabled && <div className="mt-2 flex gap-1.5 pl-8">{DAYS.map((d, i) => { const on = r.weekdays.includes(i + 1); return <button key={d} type="button" aria-pressed={on} aria-label={['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'][i]} className={cx('size-9 rounded-full text-xs font-semibold transition', on ? 'bg-accent text-accent-ink' : 'bg-surface-2 text-ink-2')} onClick={() => { const w = on ? r.weekdays.filter((x) => x !== i + 1) : [...r.weekdays, i + 1].sort(); if (w.length) upd(r.kind, { weekdays: w }); }}>{d}</button>; })}</div>}
+          {r.enabled && <div className="mt-2 flex flex-wrap gap-1.5 pl-0 sm:pl-8">{DAYS.map((d, i) => { const on = r.weekdays.includes(i + 1); return <button key={d} type="button" aria-pressed={on} aria-label={['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'][i]} className={cx('size-9 rounded-full text-xs font-semibold transition', on ? 'bg-accent text-accent-ink' : 'bg-surface-2 text-ink-2')} onClick={() => { const w = on ? r.weekdays.filter((x) => x !== i + 1) : [...r.weekdays, i + 1].sort(); if (w.length) upd(r.kind, { weekdays: w }); }}>{d}</button>; })}</div>}
         </li>))}</ul>
       <p className="t-meta">«Avisarme si llevo horas sin moverme» no es posible: requiere movimiento en tiempo real.</p>
       <Button variant="secondary" onClick={async () => { await api('/reminders', { method: 'PUT', body: JSON.stringify({ items }) }); toast('Recordatorios guardados'); }}>Guardar recordatorios</Button>

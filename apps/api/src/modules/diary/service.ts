@@ -64,9 +64,10 @@ export async function buildDiary(db: PrismaClient, userId: string, date: string)
     db.waterIntake.aggregate({ where: { userId, localDate: toDbDate(date) }, _sum: { ml: true } }),
     productAlerts(db, userId, date),
   ]);
-  const byType = new Map(meals.map((m) => [m.type, m]));
+  // La merienda ya no existe: lo registrado antes con ese tipo se muestra en Snacks.
+  const entriesOf = (type: string) => meals.filter((m) => m.type === type || (type === 'SNACKS' && m.type === 'AFTERNOON_SNACK')).flatMap((m) => m.entries);
   const outMeals = MEAL_TYPES.map((type) => {
-    const entries = (byType.get(type)?.entries ?? []).map((e) => ({
+    const entries = entriesOf(type).map((e) => ({
       id: e.id, name: e.name, grams: e.grams, isEstimate: e.isEstimate, source: e.source,
       productId: e.productId, foodId: e.foodId, at: e.createdAt, nutrients: entryNutrients(e),
     }));

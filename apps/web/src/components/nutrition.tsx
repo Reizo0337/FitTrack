@@ -1,11 +1,11 @@
 import { MEAL_LABELS } from '@fittrack/shared';
-import { Coffee, Cookie, Moon, Plus, Soup, Sun, Trash2, Repeat, type LucideIcon } from 'lucide-react';
+import { Coffee, Moon, Plus, Soup, Sun, Trash2, Repeat, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { Diary, Entry, MealDay } from '../types';
 import { Badge, Card, IconButton, cx } from '../ui/primitives';
 import { MacroIndicator, ProgressRing } from '../ui/progress';
 
-const MEAL_ICON: Record<string, LucideIcon> = { BREAKFAST: Coffee, LUNCH: Sun, AFTERNOON_SNACK: Cookie, DINNER: Moon, SNACKS: Soup };
+const MEAL_ICON: Record<string, LucideIcon> = { BREAKFAST: Coffee, LUNCH: Sun, DINNER: Moon, SNACKS: Soup };
 const kcal = (n: number) => Math.round(n).toLocaleString('es');
 
 /** Calorías del día: anillo + macros. Es el resumen central de Inicio y Alimentación. */
@@ -14,8 +14,8 @@ export function CalorieSummary({ d, compact }: { d: Diary; compact?: boolean }) 
   const over = left < 0;
   return (
     <Card>
-      <div className="flex items-center gap-5">
-        <ProgressRing value={d.totals.kcal / d.targets.kcal} size={compact ? 112 : 128} tone={over ? 'warn' : 'accent'} label="Calorías del día">
+      <div className="flex items-center gap-4 sm:gap-5">
+        <ProgressRing value={d.totals.kcal / d.targets.kcal} size={compact ? 104 : 118} tone={over ? 'warn' : 'accent'} label="Calorías del día">
           <span className="num t-title leading-none">{kcal(Math.abs(left))}</span>
           <span className="t-meta mt-1 text-[0.6875rem]">{over ? 'kcal de más' : 'kcal restantes'}</span>
         </ProgressRing>
@@ -25,7 +25,7 @@ export function CalorieSummary({ d, compact }: { d: Diary; compact?: boolean }) 
           <div className="col-span-2"><dt className="t-meta">Proteína pendiente</dt><dd className="num t-head">{Math.max(0, Math.round(d.remaining.protein ?? 0))} g</dd></div>
         </dl>
       </div>
-      <div className="mt-5 flex gap-4 border-t border-line pt-4">
+      <div className="mt-5 flex gap-2.5 sm:gap-4 border-t border-line pt-4">
         <MacroIndicator name="Proteínas" value={d.totals.protein} target={d.targets.protein} tone="protein" />
         <MacroIndicator name="Carbohidratos" value={d.totals.carbs} target={d.targets.carbs} tone="carbs" />
         <MacroIndicator name="Grasas" value={d.totals.fat} target={d.targets.fat} tone="fat" />

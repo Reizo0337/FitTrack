@@ -79,7 +79,7 @@ export const aiOption = z.object({
 export const aiRecommend = z.object({ options: z.array(aiOption).min(1).max(6) });
 export type AiOption = z.infer<typeof aiOption>;
 
-export const MEAL_IDS = ['BREAKFAST', 'LUNCH', 'AFTERNOON_SNACK', 'DINNER', 'SNACKS'] as const;
+export const MEAL_IDS = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACKS'] as const;
 export const aiMenuMeal = z.object({
   type: z.enum(MEAL_IDS), title: z.string().min(1).max(120), minutes: z.number().min(0).max(300).nullish(),
   ingredients: z.array(aiIngredient).min(1).max(25),
@@ -118,6 +118,6 @@ export const pantryScanRequest = z.object({
 });
 export const aiPantryScan = z.object({
   items: z.array(z.object({ name: z.string().trim().min(2).max(60), quantity: z.string().max(40).nullish() })).max(60),
-  notes: z.string().max(300).nullish(),
+  notes: z.string().max(500).nullish(),
 });
 export const pantryBulkSchema = z.object({ names: z.array(z.string().trim().min(2).max(60)).min(1).max(60) });

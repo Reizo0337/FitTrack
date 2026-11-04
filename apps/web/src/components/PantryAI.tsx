@@ -60,6 +60,7 @@ export function PantryScan({ onAdded }: { onAdded: () => void }) {
         <AIError e={err} />
         {found && (found.length === 0 ? <Notice tone="info">{notes ?? 'No he reconocido alimentos en la foto.'}</Notice> : (
           <>
+            {notes && <Notice tone="info">{notes}</Notice>}
             <div className="flex flex-wrap gap-2" role="group" aria-label="Alimentos detectados">
               {found.map((i) => <button key={i.name} aria-pressed={!!sel[i.name]} onClick={() => setSel({ ...sel, [i.name]: !sel[i.name] })} className={chipClass(!!sel[i.name])}>{i.name}{i.quantity ? ` · ${i.quantity}` : ''}</button>)}
             </div>

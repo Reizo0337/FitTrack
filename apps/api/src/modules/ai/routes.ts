@@ -91,7 +91,7 @@ export const aiRoutes: FastifyPluginAsync = async (app) => {
   app.post('/pantry/scan', { bodyLimit: 8_000_000 }, async (req) => {
     const b = pantryScanRequest.parse(req.body);
     const { data } = await runJson(deps(req.user.sub), 'FOOD_RECOGNITION', {
-      prompt: PANTRY_SCAN_PROMPT, user: 'Lista los alimentos que ves en las imágenes adjuntas.', schema: aiPantryScan, images: b.images, maxTokens: 1500,
+      prompt: PANTRY_SCAN_PROMPT, user: 'Identifica individualmente los alimentos en las imágenes adjuntas. Si no puedes distinguir alguno con claridad, avísalo en notes.', schema: aiPantryScan, images: b.images, maxTokens: 1500,
     });
     return { items: data.items, notes: data.notes ?? null };
   });

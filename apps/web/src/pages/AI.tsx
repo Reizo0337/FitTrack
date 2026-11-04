@@ -173,7 +173,7 @@ function ChatTab({ usage }: { usage: { calls: number; limit: number } }) {
             <ul className="flex flex-col gap-3">
               {msgs.map((m, i) => (
                 <li key={i} className={cx('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
-                  <div className={cx('max-w-[88%] rounded-[18px] px-4 py-2.5 text-[0.9375rem] leading-relaxed',
+                  <div className={cx('min-w-0 max-w-[88%] rounded-[18px] [overflow-wrap:anywhere] px-4 py-2.5 text-[0.9375rem] leading-relaxed',
                     m.role === 'user' ? 'whitespace-pre-wrap rounded-br-md bg-accent text-accent-ink' : m.error ? 'whitespace-pre-wrap rounded-bl-md bg-warn-soft' : 'rounded-bl-md border border-line bg-surface')}>
                     {m.role === 'assistant' && !m.error ? <Markdown>{m.content}</Markdown> : m.content}
                   </div>
@@ -185,11 +185,11 @@ function ChatTab({ usage }: { usage: { calls: number; limit: number } }) {
         </div>
 
       <div className={cx('shrink-0 bg-bg pb-2 pt-1', active && 'hidden')}>
-        {msgs.length > 0 && !vp.kb && <ul className="-mx-1 mb-2 flex gap-2 overflow-x-auto px-1">{TOOLS.map((t) => <li key={t.value} className="shrink-0"><button onClick={() => setTool(t.value)} className={cx(chipClass(false), 'inline-flex items-center gap-1.5')}><t.icon className="size-4" aria-hidden />{t.label}</button></li>)}</ul>}
+        {msgs.length > 0 && !vp.kb && <ul className="-mx-1 mb-2 flex gap-2 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{TOOLS.map((t) => <li key={t.value} className="shrink-0"><button onClick={() => setTool(t.value)} className={cx(chipClass(false), 'inline-flex items-center gap-1.5')}><t.icon className="size-4" aria-hidden />{t.label}</button></li>)}</ul>}
         {dictation.error && <div className="mb-2"><Notice tone="warn">{dictation.error}</Notice></div>}
         <form onSubmit={(e: FormEvent) => { e.preventDefault(); send(text); }} className="flex items-end gap-2">
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={1} maxLength={2000} aria-label="Mensaje"
-            placeholder={dictation.listening ? 'Escuchando… habla ahora' : 'Pregunta sobre tu alimentación…'}
+            placeholder={dictation.listening ? 'Escuchando… habla ahora' : 'Escribe tu pregunta…'}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(text); } }}
             className="max-h-32 min-h-11 flex-1 resize-none text-base rounded-[22px] border border-line-strong bg-surface px-4 py-2.5 placeholder:text-ink-3 focus:border-accent focus:outline-none" />
           {dictation.supported && (
@@ -208,9 +208,9 @@ function ChatTab({ usage }: { usage: { calls: number; limit: number } }) {
           </div>
         )}
         {!dictation.supported && !vp.kb && <p className="t-meta mt-2">Este navegador no admite dictado por voz. En el iPhone puedes usar el micrófono del teclado.</p>}
-        {voiceMode && !vp.kb && <p className="t-meta mt-2">Modo voz: al terminar de hablar se envía el mensaje y se lee la respuesta. El audio lo procesa el servicio de voz de tu navegador (Apple o Google).</p>}
+        {voiceMode && !vp.kb && <p className="t-meta mt-2 [@media(max-height:700px)]:hidden">Modo voz: al terminar de hablar se envía el mensaje y se lee la respuesta. El audio lo procesa el servicio de voz de tu navegador (Apple o Google).</p>}
       </div>
-        {!vp.kb && <p className="t-meta pt-2 text-center">Orientación nutricional con estimaciones; no sustituye a un profesional sanitario. {usage.calls}/{usage.limit} consultas hoy.</p>}
+        {!vp.kb && <p className="t-meta pt-2 text-center [@media(max-height:700px)]:hidden">Orientación nutricional con estimaciones; no sustituye a un profesional sanitario. {usage.calls}/{usage.limit} consultas hoy.</p>}
       </div>
     </div>
   );

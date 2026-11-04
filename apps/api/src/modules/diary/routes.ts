@@ -80,7 +80,7 @@ export const diaryRoutes: FastifyPluginAsync = async (app) => {
     let copied = 0;
     for (const m of meals) {
       if (!m.entries.length) continue;
-      const target = await getOrCreateMeal(db, userId, b.toDate, m.type, profile.timezone);
+      const target = await getOrCreateMeal(db, userId, b.toDate, m.type === 'AFTERNOON_SNACK' ? 'SNACKS' : m.type, profile.timezone);
       await db.mealEntry.createMany({
         data: m.entries.map(({ id: _id, mealId: _m, createdAt: _c, ...rest }) => ({ ...rest, mealId: target.id })),
       });

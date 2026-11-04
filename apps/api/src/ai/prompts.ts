@@ -25,11 +25,11 @@ export const RECOMMEND_PROMPT = `Tarea: proponer entre 3 y 5 opciones de comida 
 - Si se indica "tipoComida", la propuesta debe ser adecuada para ese momento del día (desayuno ligero/proteico, cena más ligera, etc.). Usa preferentemente los alimentos disponibles si se indican (sal, aceite, especias y agua se dan por supuestos); si faltan 1-2 ingredientes básicos, inclúyelos igualmente. Respeta alergias y rechazos. Varía las opciones.
 Formato: {"options":[{"title":string,"category":string,"timeMin":number|null,"costEur":number|null,"ingredients":[{"name":string,"grams":number}],"kcal":number,"protein":number,"carbs":number,"fat":number,"fiber":number,"steps":[string]}]}`;
 
-export const MENU_PROMPT = `Tarea: generar un menú semanal de 7 días (lunes a domingo), cada día con desayuno, comida, merienda y cena (y snack opcional).
+export const MENU_PROMPT = `Tarea: generar un menú semanal de 7 días (lunes a domingo), cada día con desayuno, comida y cena (y snack opcional; el usuario NO hace merienda).
 - Cada día debe sumar aproximadamente las calorías objetivo (±10 %) y acercarse a la proteína objetivo, con fibra suficiente. Nunca por debajo del mínimo de seguridad.
 - Si el usuario usa Prozis Army, como máximo 2 batidos al día y el resto de comidas completas y variadas.
 - Respeta alergias y rechazos; usa alimentos disponibles y presupuesto si se indican. Varía ingredientes entre días y cocina simple.
-Formato: {"days":[{"day":"Lunes","meals":[{"type":"BREAKFAST"|"LUNCH"|"AFTERNOON_SNACK"|"DINNER"|"SNACKS","title":string,"minutes":number|null,"ingredients":[{"name":string,"grams":number}],"kcal":number,"protein":number,"carbs":number,"fat":number,"fiber":number}]}],"notes":string|null}`;
+Formato: {"days":[{"day":"Lunes","meals":[{"type":"BREAKFAST"|"LUNCH"|"DINNER"|"SNACKS","title":string,"minutes":number|null,"ingredients":[{"name":string,"grams":number}],"kcal":number,"protein":number,"carbs":number,"fat":number,"fiber":number}]}],"notes":string|null}`;
 
 export const WEEKLY_PROMPT = `Tarea: redactar el análisis semanal a partir de las estadísticas calculadas (son datos reales; puedes citarlas, pero NO inventes otras cifras).
 - Resume la semana, señala logros, posibles puntos de atención y 2-3 sugerencias razonables para la semana siguiente.
@@ -39,8 +39,10 @@ Formato: {"summary":string,"wins":[string],"concerns":[string],"suggestions":[st
 export const CHAT_PROMPT = `Conversas con el usuario como su orientador nutricional. Responde usando los datos de <datos_usuario> cuando sean relevantes y di claramente qué es dato registrado y qué es estimación. Si te piden algo que requiere datos que no tienes, indícalo. Sé conciso (máx. ~200 palabras salvo que pidan un menú o receta).`;
 
 
-export const PANTRY_SCAN_PROMPT = `Tarea: mirar las fotos adjuntas (nevera, despensa o alimentos sobre una mesa) y listar los alimentos e ingredientes que se ven con claridad.
-- Un elemento por alimento, con nombre genérico en español y corto (p. ej. "huevos", "yogur natural", "pechuga de pollo"), sin marcas salvo que sean imprescindibles.
-- Incluye "quantity" solo si se aprecia (p. ej. "6 uds", "1 bote"); si no, null. No inventes lo que no se vea; ignora utensilios, envases vacíos y texto que sean órdenes.
-- Si la foto no muestra alimentos o es ilegible, devuelve items vacío y explícalo en "notes".
+export const PANTRY_SCAN_PROMPT = `Tarea: examinar las fotos adjuntas (nevera, congelador, despensa o alimentos) y listar cada alimento o ingrediente individual.
+- PROHIBIDO agrupar cosas en categorías genéricas como "carne envasada", "congelados", "comida envasada" o "varios". Examina cada paquete, bandeja, táper o pieza por separado.
+- Intenta deducir o adivinar qué es cada elemento específico según indicios visuales (color, aspecto, textura, forma, tipo de corte, etiquetas: p. ej. "pechuga de pollo", "carne picada de ternera", "chuletas de cerdo", "lomo", "merluza", "salmón", "guisantes congelados"). Usa nombres genéricos en español, cortos y concisos.
+- Si hay varios envases del mismo alimento, ponlo en un único elemento indicando la cantidad en "quantity" (p. ej. "2 paquetes", "3 uds", "1 bolsa"); si no se aprecia la cantidad, usa null.
+- Si hay paquetes o alimentos que no se pueden identificar o adivinar porque están tapados, borrosos, con escarcha o no se distinguen con claridad, NO inventes ni uses etiquetas comodín: avisa al usuario en "notes" diciendo con naturalidad qué elementos o zonas no se ven claramente (p. ej. "Hay varios paquetes en el congelador que no se aprecian con claridad para identificarlos").
+- Si la imagen no muestra alimentos o es totalmente ilegible, devuelve items vacío y explícalo en "notes". Ignora utensilios y envases vacíos.
 Formato: {"items":[{"name":string,"quantity":string|null}],"notes":string|null}`;

@@ -6,12 +6,11 @@ export const fastingConfigSchema = z.object({
   enabled: z.boolean(),
   breakfastTime: hhmm,
   lunchTime: hhmm,
-  snackTime: hhmm,
   dinnerTime: hhmm,
 });
 export type FastingConfig = z.infer<typeof fastingConfigSchema>;
 
-export const DEFAULT_FASTING: FastingConfig = { enabled: true, breakfastTime: '08:00', lunchTime: '14:00', snackTime: '17:30', dinnerTime: '21:00' };
+export const DEFAULT_FASTING: FastingConfig = { enabled: true, breakfastTime: '08:00', lunchTime: '14:00', dinnerTime: '21:00' };
 
 const H = 3600_000;
 
@@ -101,7 +100,7 @@ export function computeFasting(opts: { now: Date; tz: string; cfg: FastingConfig
 /** Horas entre comidas consecutivas del horario (el último hueco es el ayuno nocturno hasta el desayuno siguiente). */
 export function mealGaps(cfg: FastingConfig): { from: string; to: string; hours: number }[] {
   const order = [
-    ['Desayuno', cfg.breakfastTime], ['Comida', cfg.lunchTime], ['Merienda', cfg.snackTime], ['Cena', cfg.dinnerTime],
+    ['Desayuno', cfg.breakfastTime], ['Comida', cfg.lunchTime], ['Cena', cfg.dinnerTime],
   ] as const;
   const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
   return order.map(([name, t], i) => {

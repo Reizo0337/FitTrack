@@ -9,7 +9,7 @@ import { ProgressBar } from '../ui/progress';
 
 type Fasting = { config: FastingConfig; gaps: { from: string; to: string; hours: number }[]; status: FastingStatus; isEstimate: true };
 
-const MEALS: [keyof FastingConfig, string][] = [['breakfastTime', 'Desayuno'], ['lunchTime', 'Comida'], ['snackTime', 'Merienda'], ['dinnerTime', 'Cena']];
+const MEALS: [keyof FastingConfig, string][] = [['breakfastTime', 'Desayuno'], ['lunchTime', 'Comida'], ['dinnerTime', 'Cena']];
 const clock = (iso: string) => new Date(iso).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
 const dur = (h: number) => `${Math.floor(h)} h ${String(Math.round((h % 1) * 60)).padStart(2, '0')} min`;
 
@@ -41,7 +41,7 @@ export function FastingSettings({ onSaved }: { onSaved?: () => void }) {
         {MEALS.map(([key, label]) => (
           <li key={key} className="flex min-h-11 items-center justify-between gap-3 border-t border-line py-1 first:border-0">
             <span className="text-sm">{label}</span>
-            <input type="time" required value={cfg[key] as string} disabled={!cfg.enabled} onChange={(e) => e.target.value && setCfg({ ...cfg, [key]: e.target.value })} aria-label={`Hora de ${label.toLowerCase()}`} className="min-h-10 rounded-ctl border border-line-strong bg-surface px-2 text-sm disabled:opacity-50" />
+            <input type="time" required value={cfg[key] as string} disabled={!cfg.enabled} onChange={(e) => e.target.value && setCfg({ ...cfg, [key]: e.target.value })} aria-label={`Hora de ${label.toLowerCase()}`} className="min-h-11 rounded-ctl border border-line-strong bg-surface px-2 text-base disabled:opacity-50" />
           </li>
         ))}
       </ul>

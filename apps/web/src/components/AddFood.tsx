@@ -24,7 +24,7 @@ export function AddFood({ init, onClose }: { init: Init; onClose: () => void }) 
           onSaved={(name) => { haptic(12); toast(`${name} añadido a ${MEAL_LABELS[type].toLowerCase()}`); bump(); onClose(); }} />
       ) : (
         <div className="flex flex-col gap-3">
-          <Segmented<Tab> label="Método" value={tab} onChange={setTab} options={[{ value: 'search', label: 'Buscar' }, { value: 'scan', label: 'Escanear' }, { value: 'create', label: 'Crear' }]} />
+          <Segmented<Tab> label="Método" value={tab} onChange={setTab} block options={[{ value: 'search', label: 'Buscar' }, { value: 'scan', label: 'Escanear' }, { value: 'create', label: 'Crear' }]} />
           {tab === 'search' && <FoodSearch onPick={setItem} />}
           {tab === 'scan' && <Scan onPick={setItem} onMissing={(barcode, msg) => { setPrefill({ barcode, msg }); setTab('create'); }} />}
           {tab === 'create' && <Create prefill={prefill} onCreated={setItem} />}
@@ -285,7 +285,7 @@ function FoodDetail({ item, date, type, setType, onBack, onSaved, onChanged }: {
       )}
       <div className="grid grid-cols-[1fr_auto] gap-2">
         <FormField label="Cantidad" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} error={!valid ? 'Indica una cantidad entre 0 y 5000 g.' : undefined} />
-        <SelectField label="Unidad" value={mode} className="w-40" onChange={(e) => { const m = e.target.value as 'g' | 'u'; if (m === 'g' && unitSize && valid) setQty(String(Math.round(grams))); if (m === 'u' && unitSize) setQty('1'); setMode(m); }}>
+        <SelectField label="Unidad" value={mode} className="w-32 sm:w-40" onChange={(e) => { const m = e.target.value as 'g' | 'u'; if (m === 'g' && unitSize && valid) setQty(String(Math.round(grams))); if (m === 'u' && unitSize) setQty('1'); setMode(m); }}>
           <option value="g">gramos</option>
           {unitSize && <option value="u">{unitLabel} ({unitSize} g)</option>}
         </SelectField>
