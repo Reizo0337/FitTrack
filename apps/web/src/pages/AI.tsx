@@ -85,6 +85,19 @@ export function AI() {
   return <ChatTab usage={cfg.data.usageToday} />;
 }
 
+/** Función del asistente como un círculo con su icono. Con `labelled` lleva el nombre debajo (pantalla de bienvenida). */
+function ToolCircle({ t, onOpen, labelled = false }: { t: (typeof TOOLS)[number]; onOpen: () => void; labelled?: boolean }) {
+  return (
+    <button data-tool={t.value} onClick={onOpen} aria-label={t.label} title={`${t.label}: ${t.hint}`}
+      className={cx('group flex flex-col items-center gap-1.5', labelled ? 'w-16 rounded-ctl' : 'rounded-full')}>
+      <span className="flex size-11 items-center justify-center rounded-full border border-line-strong bg-surface text-accent-strong transition group-hover:bg-surface-2 group-active:scale-95">
+        <t.icon className="size-5" aria-hidden />
+      </span>
+      {labelled && <span className="text-[0.6875rem] font-medium leading-tight text-ink-2" aria-hidden>{t.label}</span>}
+    </button>
+  );
+}
+
 function ChatTab({ usage }: { usage: { calls: number; limit: number } }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [convo, setConvo] = useState<string | undefined>();
@@ -176,10 +189,7 @@ function ChatTab({ usage }: { usage: { calls: number; limit: number } }) {
               <div className="mb-4 flex items-start gap-3"><span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-accent-strong"><Sparkles className="size-[18px]" aria-hidden /></span>
                 <p className="t-body pt-1">Hola. Consulto tus comidas, peso, actividad y sueño para orientarte. No soy médico: ante dudas de salud, consulta a un profesional.</p></div>
               <p className="t-over mb-2">Funciones</p>
-              <ul className="mb-4 grid grid-cols-2 gap-2">{TOOLS.map((t) => (
-                <li key={t.value}><button data-tool={t.value} onClick={() => setTool(t.value)} className="flex min-h-[4.25rem] w-full items-center gap-3 rounded-ctl border border-line-strong bg-surface px-3 text-left transition hover:bg-surface-2 active:scale-[.98]">
-                  <t.icon className="size-5 shrink-0 text-accent-strong" aria-hidden /><span><span className="block text-sm font-semibold">{t.label}</span><span className="t-meta block leading-tight">{t.hint}</span></span></button></li>
-              ))}</ul>
+              <ul className="mb-4 flex gap-4" aria-label="Funciones">{TOOLS.map((t) => <li key={t.value}><ToolCircle t={t} labelled onOpen={() => setTool(t.value)} /></li>)}</ul>
               <p className="t-over mb-2">Prueba a preguntar</p>
               <ul className="flex flex-wrap gap-2">{SUGGESTIONS.map((s) => <li key={s}><button onClick={() => send(s)} className={chipClass(false)}>{s}</button></li>)}</ul>
             </div>
@@ -200,8 +210,8 @@ function ChatTab({ usage }: { usage: { calls: number; limit: number } }) {
 
       <div className={cx('shrink-0 border-t border-line bg-bg pb-2 pt-2', active && 'hidden')}>
         {msgs.length > 0 && !vp.kb && (
-          <ul className="-mx-1 mb-2 flex gap-2 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [@media(max-height:520px)]:hidden" aria-label="Funciones">
-            {TOOLS.map((t) => <li key={t.value} className="shrink-0"><button data-tool={t.value} onClick={() => setTool(t.value)} className={cx(chipClass(false), 'inline-flex items-center gap-1.5')}><t.icon className="size-4" aria-hidden />{t.label}</button></li>)}
+          <ul className="mb-2 flex items-center gap-2.5 [@media(max-height:520px)]:hidden" aria-label="Funciones">
+            {TOOLS.map((t) => <li key={t.value}><ToolCircle t={t} onOpen={() => setTool(t.value)} /></li>)}
           </ul>
         )}
         {dictation.error && <div className="mb-2"><Notice tone="warn">{dictation.error}</Notice></div>}
