@@ -63,7 +63,9 @@ function Shell({ onLogout }: { onLogout: () => void }) {
   useEffect(() => { scroller.current?.scrollTo(0, 0); }, [pathname]);
   const chat = pathname.startsWith('/ai');
   return (
-    <div ref={scroller} className="h-dvh overflow-y-auto overscroll-y-none lg:pl-60">
+    // Marco fijo con el alto de la app sin teclado, contra-desplazado lo que iOS deslice la ventana: el teclado lo tapa, no lo mueve.
+    <div className="fixed inset-x-0 top-0 overflow-hidden" style={{ height: 'var(--app-h, 100dvh)', transform: 'translateY(var(--vv-top, 0px))' }}>
+    <div ref={scroller} className="h-full overflow-y-auto overscroll-y-none lg:pl-60">
       <Sidebar onQuickAdd={openQuick} />
       <main className="mx-auto w-full max-w-xl px-4 pt-safe lg:max-w-5xl lg:px-10 lg:pb-12 lg:pt-8" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 7rem)' }}>
         {/* El chat usa position:fixed: su página solo puede animar opacidad (un transform lo descolocaría) */}
@@ -81,6 +83,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
           </Suspense>
         </div>
       </main>
+    </div>
       <BottomNavigation />
       {!chat && <QuickAddButton />}
     </div>

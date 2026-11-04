@@ -1,4 +1,5 @@
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Button, IconButton, cx } from './primitives';
 
@@ -27,11 +28,12 @@ export function Sheet({ open, onClose, title, children, size = 'md' }: { open: b
     return () => { document.removeEventListener('keydown', key); document.body.style.overflow = overflow; (prevFocus.current as HTMLElement | null)?.focus?.(); };
   }, [open, onClose]);
   if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-40 flex pb-[var(--kb,0px)] items-end justify-center md:items-center" role="presentation">
+  // En el <body> (fuera del marco de la app) y con la misma regla: alto fijo, contra-desplazado y levantado sobre el teclado.
+  return createPortal(
+    <div className="fixed inset-x-0 top-0 z-40 flex items-end justify-center pb-[var(--kb,0px)] md:items-center" style={{ height: 'var(--app-h, 100dvh)', transform: 'translateY(var(--vv-top, 0px))' }} role="presentation">
       <div className="fade-in absolute inset-0 bg-[var(--scrim)]" onClick={onClose} aria-hidden />
       <div ref={ref} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}
-        className={cx('sheet-in relative flex max-h-[92dvh] w-full flex-col rounded-t-[24px] border border-line bg-bg shadow-[var(--shadow-pop)] outline-none md:max-h-[86dvh] md:rounded-[24px]', size === 'lg' ? 'md:max-w-2xl' : 'md:max-w-lg')}>
+        className={cx('sheet-in relative flex max-h-[calc((var(--app-h,100dvh)-var(--kb,0px))*0.92)] w-full flex-col rounded-t-[24px] border border-line bg-bg shadow-[var(--shadow-pop)] outline-none md:max-h-[86dvh] md:rounded-[24px]', size === 'lg' ? 'md:max-w-2xl' : 'md:max-w-lg')}>
         <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-line-strong md:hidden" aria-hidden />
         <header className="flex items-center justify-between px-4 pb-1 pt-2 md:pt-4">
           <h2 className="t-title">{title}</h2>
@@ -39,7 +41,8 @@ export function Sheet({ open, onClose, title, children, size = 'md' }: { open: b
         </header>
         <div className="overflow-y-auto overscroll-contain px-4 pb-safe pt-2">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

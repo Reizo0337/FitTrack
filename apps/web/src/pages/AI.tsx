@@ -157,7 +157,7 @@ function ChatTab({ usage }: { usage: { calls: number } }) {
   const active = TOOLS.find((t) => t.value === tool);
 
   return (
-    <div style={style} className="max-lg:fixed max-lg:inset-x-0 max-lg:top-0 max-lg:z-20 max-lg:h-[calc(100dvh-var(--nav-h))] max-lg:bg-bg max-lg:px-4 lg:h-[calc(100dvh-4rem)]">
+    <div style={style} className="max-lg:fixed max-lg:inset-x-0 max-lg:top-0 max-lg:z-20 max-lg:h-[calc(var(--app-h,100dvh)-var(--nav-h))] max-lg:bg-bg max-lg:px-4 lg:h-[calc(100dvh-4rem)]">
       <div className="mx-auto flex h-full max-w-2xl flex-col">
         <header className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-line pb-2 max-lg:pt-[max(0.5rem,env(safe-area-inset-top))]">
           {active ? (
