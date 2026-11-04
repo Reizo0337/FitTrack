@@ -1,0 +1,14 @@
+{
+  "name": "fittrack",
+  "private": true,
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "dev:db": "npm run dev:db -w @fittrack/api",
+    "dev:api": "npm run dev -w @fittrack/api",
+    "dev:web": "npm run dev -w @fittrack/web",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "create-user": "npm run create-user -w @fittrack/api --"
+  },
+  "engines": { "node": ">=20" }
+}

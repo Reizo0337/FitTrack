@@ -1,0 +1,423 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Convenciones: instantes en timestamptz (UTC); `localDate` = día calendario del usuario
+// (@db.Date) para agrupar correctamente aunque cambie de zona horaria; `tz` = IANA.
+
+enum Sex {
+  MALE
+  FEMALE
+}
+enum ActivityLevel {
+  SEDENTARY
+  LIGHT
+  MODERATE
+  ACTIVE
+  VERY_ACTIVE
+}
+enum DataSource {
+  MANUAL
+  HEALTH
+  OPEN_FOOD_FACTS
+  OCR
+  AI
+  SEED
+}
+enum MealType {
+  BREAKFAST
+  LUNCH
+  AFTERNOON_SNACK
+  DINNER
+  SNACKS
+}
+enum AIProvider {
+  ANTHROPIC
+  GEMINI
+  OPENAI
+}
+enum AITask {
+  NUTRITIONIST
+  FOOD_RECOGNITION
+  WEEKLY_ANALYSIS
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now()) @db.Timestamptz
+  profile      UserProfile?
+  refreshTokens RefreshToken[]
+  ingestTokens  IngestToken[]
+  weights      WeightEntry[]
+  measurements BodyMeasurement[]
+  photos       ProgressPhoto[]
+  foods        Food[]
+  products     FoodProduct[]
+  recipes      Recipe[]
+  meals        Meal[]
+  daily        DailyNutrition[]
+  water        WaterIntake[]
+  activity     ActivityRecord[]
+  workouts     Workout[]
+  sleep        SleepRecord[]
+  reminders    Reminder[]
+  goals        Goal[]
+  conversations AIConversation[]
+  aiConfigs    AIProviderConfig[]
+  aiKeys       AIProviderKey[]
+  healthSync   HealthSyncRecord[]
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime @db.Timestamptz
+  revokedAt DateTime? @db.Timestamptz
+  createdAt DateTime @default(now()) @db.Timestamptz
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+// Token personal de larga duración SOLO para enviar datos de Apple Health (Atajos).
+model IngestToken {
+  id        String   @id @default(cuid())
+  userId    String
+  label     String
+  tokenHash String   @unique
+  lastUsedAt DateTime? @db.Timestamptz
+  revokedAt DateTime? @db.Timestamptz
+  createdAt DateTime @default(now()) @db.Timestamptz
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserProfile {
+  userId        String   @id
+  displayName   String   @default("")
+  birthDate     DateTime @db.Date
+  sex           Sex
+  heightCm      Float
+  startWeightKg Float
+  goalWeightKg  Float
+  activityLevel ActivityLevel @default(SEDENTARY)
+  timezone      String   @default("Europe/Madrid")
+  targetKcal    Int
+  targetProteinG Float
+  targetFatG    Float
+  targetFiberG  Float
+  targetWaterMl Int
+  allergies     String[]
+  dislikedFoods String[]
+  aiConsent     Boolean  @default(false)
+  updatedAt     DateTime @updatedAt @db.Timestamptz
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WeightEntry {
+  id         String   @id @default(cuid())
+  userId     String
+  measuredAt DateTime @db.Timestamptz
+  localDate  DateTime @db.Date
+  tz         String
+  weightKg   Float
+  bodyFatPct Float?
+  muscleKg   Float?
+  bodyWaterPct Float?
+  source     DataSource @default(MANUAL)
+  externalId String?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, source, externalId])
+  @@index([userId, localDate])
+}
+
+model BodyMeasurement {
+  id        String   @id @default(cuid())
+  userId    String
+  localDate DateTime @db.Date
+  waistCm   Float?
+  chestCm   Float?
+  hipCm     Float?
+  armCm     Float?
+  thighCm   Float?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, localDate])
+}
+
+model ProgressPhoto {
+  id        String   @id @default(cuid())
+  userId    String
+  takenAt   DateTime @db.Timestamptz
+  storageKey String  // ruta privada; se sirve con URL firmada de corta duración
+  note      String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Alimento genérico o personalizado (valores por 100 g).
+model Food {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  kcal100   Float
+  protein100 Float
+  carbs100  Float
+  fat100    Float
+  satFat100 Float    @default(0)
+  fiber100  Float    @default(0)
+  sugars100 Float    @default(0)
+  salt100   Float    @default(0)
+  unitName  String?  // p. ej. "unidad", "cucharada"
+  unitGrams Float?   // gramos por unidad
+  isFavorite Boolean @default(false)
+  source    DataSource @default(MANUAL)
+  createdAt DateTime @default(now()) @db.Timestamptz
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries   MealEntry[]
+  recipeItems RecipeItem[]
+  @@index([userId, name])
+}
+
+// Producto envasado con código de barras (Open Food Facts, OCR o manual).
+model FoodProduct {
+  id        String   @id @default(cuid())
+  userId    String
+  barcode   String?
+  name      String
+  brand     String?
+  kcal100   Float
+  protein100 Float
+  carbs100  Float
+  fat100    Float
+  satFat100 Float    @default(0)
+  fiber100  Float    @default(0)
+  sugars100 Float    @default(0)
+  salt100   Float    @default(0)
+  servingG  Float?   // tamaño de ración declarado; NUNCA se asume que igual a 100 g
+  servingName String?
+  isFavorite Boolean @default(false)
+  source    DataSource @default(MANUAL)
+  usageCount Int     @default(0)
+  lastUsedAt DateTime? @db.Timestamptz
+  createdAt DateTime @default(now()) @db.Timestamptz
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries   MealEntry[]
+  recipeItems RecipeItem[]
+  @@unique([userId, barcode])
+  @@index([userId, name])
+}
+
+model Recipe {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  servings  Float    @default(1)
+  instructions String?
+  createdAt DateTime @default(now()) @db.Timestamptz
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     RecipeItem[]
+}
+
+model RecipeItem {
+  id        String  @id @default(cuid())
+  recipeId  String
+  foodId    String?
+  productId String?
+  grams     Float
+  recipe    Recipe  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  food      Food?        @relation(fields: [foodId], references: [id])
+  product   FoodProduct? @relation(fields: [productId], references: [id])
+}
+
+model Meal {
+  id        String   @id @default(cuid())
+  userId    String
+  localDate DateTime @db.Date
+  type      MealType
+  eatenAt   DateTime? @db.Timestamptz
+  tz        String
+  entries   MealEntry[]
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, localDate, type])
+}
+
+// Los nutrientes se guardan calculados (snapshot) con la cantidad real consumida.
+model MealEntry {
+  id        String   @id @default(cuid())
+  mealId    String
+  foodId    String?
+  productId String?
+  name      String
+  grams     Float
+  kcal      Float
+  protein   Float
+  carbs     Float
+  fat       Float
+  satFat    Float @default(0)
+  fiber     Float @default(0)
+  sugars    Float @default(0)
+  salt      Float @default(0)
+  isEstimate Boolean @default(false) // true si viene de IA/estimación
+  source    DataSource @default(MANUAL)
+  createdAt DateTime @default(now()) @db.Timestamptz
+  meal      Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  food      Food?        @relation(fields: [foodId], references: [id], onDelete: SetNull)
+  product   FoodProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  @@index([mealId])
+}
+
+// Agregado cacheado por día, recalculable a partir de MealEntry.
+model DailyNutrition {
+  id        String   @id @default(cuid())
+  userId    String
+  localDate DateTime @db.Date
+  kcal      Float @default(0)
+  protein   Float @default(0)
+  carbs     Float @default(0)
+  fat       Float @default(0)
+  satFat    Float @default(0)
+  fiber     Float @default(0)
+  sugars    Float @default(0)
+  salt      Float @default(0)
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, localDate])
+}
+
+model WaterIntake {
+  id        String   @id @default(cuid())
+  userId    String
+  localDate DateTime @db.Date
+  at        DateTime @default(now()) @db.Timestamptz
+  ml        Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, localDate])
+}
+
+model ActivityRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  localDate DateTime @db.Date
+  source    DataSource
+  steps     Int?
+  activeKcal Float?
+  restingKcal Float?
+  distanceKm Float?
+  exerciseMin Float?
+  avgHeartRate Float?
+  restingHeartRate Float?
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, localDate, source])
+}
+
+model Workout {
+  id        String   @id @default(cuid())
+  userId    String
+  startedAt DateTime @db.Timestamptz
+  localDate DateTime @db.Date
+  type      String
+  durationMin Float
+  activeKcal Float?
+  distanceKm Float?
+  avgHeartRate Float?
+  source    DataSource
+  externalId String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, source, externalId])
+  @@index([userId, localDate])
+}
+
+model SleepRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  localDate DateTime @db.Date // día en el que te despiertas
+  bedtimeAt DateTime? @db.Timestamptz
+  sleepAt   DateTime? @db.Timestamptz
+  wakeAt    DateTime? @db.Timestamptz
+  totalMin  Int?
+  quality   Int?      // 1-5 subjetiva
+  awakenings Int?
+  source    DataSource
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, localDate, source])
+}
+
+model Reminder {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String   // WAKE, WATER, BREAKFAST, LUNCH, DINNER, WALK, WEIGH_IN, BEDTIME...
+  enabled   Boolean  @default(true)
+  timeLocal String   // HH:mm
+  weekdays  Int[]    // 1=lunes ... 7=domingo
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Goal {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String   // STEPS, PROTEIN, WATER, SLEEP, LOG_MEALS, WORKOUTS, WEIGHT_MILESTONE
+  target    Float
+  period    String   @default("DAY") // DAY | WEEK
+  active    Boolean  @default(true)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AIProviderConfig {
+  id        String     @id @default(cuid())
+  userId    String
+  task      AITask
+  provider  AIProvider
+  model     String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, task])
+}
+
+// Claves API cifradas (AES-256-GCM). Nunca se devuelven al cliente.
+model AIProviderKey {
+  id         String     @id @default(cuid())
+  userId     String
+  provider   AIProvider
+  encryptedKey String
+  createdAt  DateTime   @default(now()) @db.Timestamptz
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, provider])
+}
+
+model AIConversation {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String?
+  createdAt DateTime @default(now()) @db.Timestamptz
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  AIMessage[]
+}
+
+model AIMessage {
+  id        String   @id @default(cuid())
+  conversationId String
+  role      String   // user | assistant
+  content   String
+  tokensIn  Int?
+  tokensOut Int?
+  createdAt DateTime @default(now()) @db.Timestamptz
+  conversation AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  @@index([conversationId])
+}
+
+// Idempotencia de sincronización con Apple Health: un mismo UUID/hash nunca se importa dos veces.
+model HealthSyncRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  dataType  String   // steps, activeEnergy, sleep, weight, workout...
+  externalId String  // sampleUUID, o "tipo:fecha" para agregados diarios
+  contentHash String
+  syncedAt  DateTime @default(now()) @db.Timestamptz
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, dataType, externalId])
+}

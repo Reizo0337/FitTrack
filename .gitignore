@@ -1,0 +1,7 @@
+node_modules
+dist
+.env
+.data
+*.log
+apps/web/ios
+apps/api/uploads
