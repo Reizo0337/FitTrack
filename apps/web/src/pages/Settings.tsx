@@ -8,7 +8,7 @@ type PushCfg = { enabled: boolean; publicKey: string | null; cronConfigured: boo
 
 const KIND_LABEL: Record<string, string> = {
   WAKE: 'Registrar la hora de despertar', WATER: 'Beber agua', BREAKFAST: 'Registrar el desayuno', LUNCH: 'Registrar la comida', DINNER: 'Registrar la cena',
-  WALK: 'Caminar (si llevas pocos pasos)', LOG_DINNER: 'Completar el seguimiento del día', BEDTIME: 'Hora de acostarme', WEIGH_IN: 'Pesarme',
+  WALK: 'Caminar (si llevas pocos pasos)', LOG_DINNER: 'Completar el seguimiento del día', BEDTIME: 'Hora de acostarme', WEIGH_IN: 'Pesarme', WEEKLY_REPORT: 'Aviso del informe semanal (domingo)',
 };
 const DAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const ACT: [string, string][] = [['SEDENTARY', 'Sedentaria'], ['LIGHT', 'Ligera'], ['MODERATE', 'Moderada'], ['ACTIVE', 'Alta'], ['VERY_ACTIVE', 'Muy alta']];
@@ -25,6 +25,7 @@ export function Settings() {
       <h1 className="text-2xl font-bold">Ajustes</h1>
       {msg && <p role="status" className="rounded-xl bg-slate-200 p-3 text-sm dark:bg-slate-800">{msg}</p>}
       <Goals say={setMsg} />
+      <AiSettings say={setMsg} />
       <Health say={setMsg} />
       <Notifications say={setMsg} />
     </div>
@@ -65,6 +66,55 @@ function Goals({ say }: { say: (m: string) => void }) {
       {warn.map((w) => <p key={w} className="text-sm text-amber-500">⚠ {w}</p>)}
       <button className="btn">Guardar objetivos</button>
     </form>
+  );
+}
+
+type AiCfg = {
+  consent: boolean; providers: { provider: string; hasKey: boolean }[]; tasks: { task: string; provider: string; model: string }[];
+  defaults: Record<string, Record<string, string>>; usageToday: { calls: number; limit: number; tokensIn: number; tokensOut: number };
+};
+const TASK_LABEL: Record<string, string> = { NUTRITIONIST: 'Nutricionista (chat, recomendaciones, menús)', FOOD_RECOGNITION: 'Reconocimiento de comidas', WEEKLY_ANALYSIS: 'Análisis semanal' };
+const PROV_LABEL: Record<string, string> = { ANTHROPIC: 'Anthropic Claude', GEMINI: 'Google Gemini', OPENAI: 'OpenAI' };
+
+function AiSettings({ say }: { say: (m: string) => void }) {
+  const [c, setC] = useState<AiCfg | null>(null);
+  const load = useCallback(() => api<AiCfg>('/ai/config').then(setC), []);
+  useEffect(() => { load(); }, [load]);
+  if (!c) return null;
+  async function saveKey(e: FormEvent<HTMLFormElement>, provider: string) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    try { await api('/ai/keys', { method: 'PUT', body: JSON.stringify({ provider, apiKey: String(f.get('key')) }) }); e.currentTarget.reset(); say(`Clave de ${PROV_LABEL[provider]} guardada (cifrada en el servidor).`); load(); }
+    catch { say('Clave no válida.'); }
+  }
+  async function delKey(provider: string) { await api(`/ai/keys/${provider}`, { method: 'DELETE' }); say('Clave eliminada.'); load(); }
+  async function saveTasks(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    const items = c!.tasks.map((t) => ({ task: t.task, provider: String(f.get(`p-${t.task}`)), model: String(f.get(`m-${t.task}`)).trim() }));
+    try { await api('/ai/config', { method: 'PUT', body: JSON.stringify({ items }) }); say('Modelos guardados.'); load(); } catch { say('Nombre de modelo no válido.'); }
+  }
+  return (
+    <section className="card flex flex-col gap-3">
+      <h2 className="font-semibold">Inteligencia artificial</h2>
+      <p className="text-xs text-slate-500">Las claves se guardan <b>cifradas en tu servidor</b> y nunca vuelven al navegador ni se envían a la web. Solo se contacta con el proveedor que elijas, y solo si activas el consentimiento (en Objetivos). Se envían datos agregados, sin nombre ni email.</p>
+      {!c.consent && <p className="text-sm text-amber-500">El consentimiento de IA está desactivado: ninguna función de IA enviará datos.</p>}
+      <ul className="text-sm">{c.providers.map((p) => (
+        <li key={p.provider} className="border-t border-slate-200 py-2 dark:border-slate-800">
+          <div className="flex items-center justify-between"><b>{PROV_LABEL[p.provider]}</b><span className={p.hasKey ? 'text-accent' : 'text-slate-500'}>{p.hasKey ? 'clave guardada' : 'sin clave'}</span></div>
+          <form onSubmit={(e) => saveKey(e, p.provider)} className="mt-2 flex gap-2"><input name="key" type="password" autoComplete="off" className="input" placeholder={p.hasKey ? 'Reemplazar clave…' : 'Pegar clave API'} required minLength={10} /><button className="btn shrink-0">Guardar</button>{p.hasKey && <button type="button" className="shrink-0 text-red-500" onClick={() => delKey(p.provider)}>Quitar</button>}</form>
+        </li>))}</ul>
+      <form onSubmit={saveTasks} className="flex flex-col gap-2">
+        <h3 className="text-sm font-semibold">Modelo por tarea</h3>
+        {c.tasks.map((t) => (
+          <div key={t.task} className="grid grid-cols-2 gap-2"><p className="col-span-2 text-xs text-slate-500">{TASK_LABEL[t.task]}</p>
+            <select name={`p-${t.task}`} defaultValue={t.provider} className="input">{Object.keys(PROV_LABEL).map((p) => <option key={p} value={p}>{PROV_LABEL[p]}</option>)}</select>
+            <input name={`m-${t.task}`} defaultValue={t.model} className="input" aria-label={`Modelo ${t.task}`} /></div>))}
+        <p className="text-xs text-slate-500">Los nombres de modelo cambian con el tiempo: si uno deja de existir, el proveedor devolverá error; cámbialo aquí. Sugerencias al cambiar de proveedor: {Object.entries(c.defaults).map(([p, m]) => `${PROV_LABEL[p]}: ${m.NUTRITIONIST}`).join(' · ')}.</p>
+        <button className="btn">Guardar modelos</button>
+      </form>
+      <p className="text-xs text-slate-500">Control de costes: se reutilizan respuestas idénticas y hay un límite diario. Hoy: {c.usageToday.calls} de {c.usageToday.limit} llamadas ({c.usageToday.tokensIn + c.usageToday.tokensOut} tokens).</p>
+    </section>
   );
 }
 

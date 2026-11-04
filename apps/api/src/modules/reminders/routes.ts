@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { tick, type Sender } from './service';
 
 const DEFAULT_TIMES: Record<string, string> = {
-  WAKE: '08:00', WATER: '11:00', BREAKFAST: '10:00', LUNCH: '15:30', WALK: '18:00', LOG_DINNER: '22:00', BEDTIME: '23:15', WEIGH_IN: '08:30', DINNER: '22:30',
+  WAKE: '08:00', WATER: '11:00', BREAKFAST: '10:00', LUNCH: '15:30', WALK: '18:00', LOG_DINNER: '22:00', BEDTIME: '23:15', WEIGH_IN: '08:30', DINNER: '22:30', WEEKLY_REPORT: '20:00',
 };
 
 export const reminderRoutes: FastifyPluginAsync = async (app) => {
@@ -69,7 +69,7 @@ export const reminderRoutes: FastifyPluginAsync = async (app) => {
     priv.get('/reminders', async (req) => {
       const rows = await db.reminder.findMany({ where: { userId: req.user.sub } });
       const by = new Map(rows.map((r) => [r.kind, r]));
-      return { items: reminderKinds.map((kind) => { const r = by.get(kind); return { kind, enabled: r?.enabled ?? false, timeLocal: r?.timeLocal ?? DEFAULT_TIMES[kind]!, weekdays: r?.weekdays ?? (kind === 'WEIGH_IN' ? [1, 3, 5] : [1, 2, 3, 4, 5, 6, 7]) }; }) };
+      return { items: reminderKinds.map((kind) => { const r = by.get(kind); return { kind, enabled: r?.enabled ?? false, timeLocal: r?.timeLocal ?? DEFAULT_TIMES[kind]!, weekdays: r?.weekdays ?? (kind === 'WEIGH_IN' ? [1, 3, 5] : kind === 'WEEKLY_REPORT' ? [7] : [1, 2, 3, 4, 5, 6, 7]) }; }) };
     });
     priv.put('/reminders', async (req) => {
       const list = reminderListSchema.parse((req.body as { items?: unknown })?.items);

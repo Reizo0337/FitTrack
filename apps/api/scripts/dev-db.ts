@@ -5,7 +5,7 @@ import EmbeddedPostgres from 'embedded-postgres';
 
 const dir = resolve(import.meta.dirname, '../../../.data/pg');
 const fresh = !existsSync(resolve(dir, 'PG_VERSION'));
-const pg = new EmbeddedPostgres({ databaseDir: dir, user: 'fittrack', password: 'fittrack', port: 5433, persistent: true });
+const pg = new EmbeddedPostgres({ databaseDir: dir, user: 'fittrack', password: 'fittrack', port: 5433, persistent: true, initdbFlags: ['--encoding=UTF8', '--locale=C'] });
 if (fresh) await pg.initialise();
 await pg.start();
 if (fresh) await pg.createDatabase('fittrack');

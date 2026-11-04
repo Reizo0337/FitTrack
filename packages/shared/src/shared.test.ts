@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseNutritionText, pearson, rollingAverageByDate, assessPace, bmrMifflin, checkCalorieTarget, expectedWeeklyLossKg, movingAverage, scaleFromPer100, tdeeFromBmr, totalExpenditure, weeksToGoal } from './index';
+import { detectTrend, findViolations, weeklyWindows, parseNutritionText, pearson, rollingAverageByDate, assessPace, bmrMifflin, checkCalorieTarget, expectedWeeklyLossKg, movingAverage, scaleFromPer100, tdeeFromBmr, totalExpenditure, weeksToGoal } from './index';
 
 const prozis100 = { kcal: 384, protein: 42, carbs: 33, fat: 9, satFat: 2.4, fiber: 1.7, sugars: 2.5, salt: 1 };
 
@@ -24,6 +24,32 @@ describe('OCR de etiquetas', () => {
     expect(r.per100).toBe(true);
     expect(r.values).toEqual({ kcal: 394, fat: 8.5, satFat: 2.1, carbs: 55, sugars: 4.2, fiber: 6.3, protein: 12, salt: 1.1 });
     expect(parseNutritionText('texto sin datos').values).toEqual({});
+  });
+});
+
+describe('tendencia y restricciones', () => {
+  const pts = (vals: [string, number][]) => vals.map(([date, value]) => ({ date, value }));
+  it('detecta estancamiento sobre la media semanal, no sobre un día', () => {
+    const flat = pts([['2026-10-14', 110.4], ['2026-10-16', 110.5], ['2026-10-19', 110.3], ['2026-10-21', 110.4], ['2026-10-26', 110.5], ['2026-10-28', 110.3], ['2026-11-02', 110.4], ['2026-11-03', 110.6], ['2026-11-04', 110.2]]);
+    const t = detectTrend(weeklyWindows(flat, '2026-11-04', 4), 110);
+    expect(t.status).toBe('stalled');
+    expect(t.message).toMatch(/profesional/);
+  });
+  it('un día alto aislado no cambia el estado de una tendencia a la baja', () => {
+    const down = pts([['2026-10-14', 112], ['2026-10-16', 111.9], ['2026-10-19', 111.2], ['2026-10-21', 111.1], ['2026-10-23', 111], ['2026-10-26', 110.5], ['2026-10-28', 110.4], ['2026-11-02', 109.8], ['2026-11-03', 111.5], ['2026-11-04', 109.7]]);
+    expect(detectTrend(weeklyWindows(down, '2026-11-04', 4), 110).status).toBe('progressing');
+  });
+  it('sin pesajes suficientes no concluye', () => {
+    expect(detectTrend(weeklyWindows(pts([['2026-11-04', 110]]), '2026-11-04', 4), 110).status).toBe('insufficient_data');
+  });
+  it('avisa si baja demasiado deprisa', () => {
+    const fast = pts([['2026-10-14', 114], ['2026-10-16', 114], ['2026-10-19', 113], ['2026-10-21', 112.8], ['2026-10-26', 111], ['2026-10-28', 110.8], ['2026-11-01', 109], ['2026-11-02', 108.8], ['2026-11-04', 108.6]]);
+    expect(detectTrend(weeklyWindows(fast, '2026-11-04', 4), 109).status).toBe('too_fast');
+  });
+  it('detecta alérgenos sin importar mayúsculas ni acentos', () => {
+    expect(findViolations(['Pan de GLUTEN', 'Hígado de res', 'arroz'], ['gluten', 'higado'])).toHaveLength(2);
+    expect(findViolations(['arroz'], ['gluten'])).toEqual([]);
+    expect(findViolations(['arroz'], ['a'])).toEqual([]); // términos demasiado cortos se ignoran
   });
 });
 

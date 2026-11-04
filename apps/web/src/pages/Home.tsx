@@ -22,10 +22,12 @@ export function Home() {
   const [d, setD] = useState<Dash | null>(null);
   const [der, setDer] = useState<Derived | null>(null);
   const [err, setErr] = useState(false);
+  const [trend, setTrend] = useState<{ status: string; message: string } | null>(null);
   const date = todayStr();
   const load = useCallback(async () => {
     const [a, b] = await Promise.all([api<Dash>(`/dashboard?date=${date}`), api<{ derived: Derived }>('/profile')]);
     setD(a); setDer(b.derived);
+    api<{ trend: { status: string; message: string } }>(`/insights/status?date=${date}`).then((r) => setTrend(r.trend)).catch(() => undefined);
   }, [date]);
   useEffect(() => { load().catch(() => setErr(true)); }, [load, version]);
 
@@ -54,6 +56,9 @@ export function Home() {
         </div>
       </section>
       {w.currentKg == null && <p className="text-sm text-slate-500">Registra tu primer peso en <b>Progreso</b> para ver tu avance.</p>}
+      {trend && trend.status !== 'insufficient_data' && (
+        <p role="note" className={`rounded-xl p-3 text-sm ${trend.status === 'stalled' || trend.status === 'too_fast' || trend.status === 'gaining' ? 'bg-amber-500/10' : 'bg-accent/10'}`}>{trend.message}</p>
+      )}
 
       <section className="card">
         <div className="flex items-center gap-4">

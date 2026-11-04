@@ -5,9 +5,9 @@ import { AppProvider, useApp } from './ctx';
 import { Food } from './pages/Food';
 import { Home } from './pages/Home';
 import { Activity } from './pages/Activity';
+import { AI } from './pages/AI';
 import { Progress } from './pages/Progress';
 import { Settings } from './pages/Settings';
-import { Soon } from './pages/Soon';
 
 function Login({ onDone }: { onDone: () => void }) {
   const [error, setError] = useState('');
@@ -86,7 +86,7 @@ export function App() {
         <Route path="/activity" element={<Activity />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/progress" element={<Progress />} />
-        <Route path="/ai" element={<Soon title="IA" phase="Fase 5: nutricionista y menús" />} />
+        <Route path="/ai" element={<AI />} />
       </Routes>
       <nav className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-slate-800 dark:bg-[#0b0f14]/90">
         <ul className="mx-auto flex max-w-2xl">

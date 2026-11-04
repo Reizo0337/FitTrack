@@ -15,6 +15,8 @@ const schema = z.object({
   VAPID_SUBJECT: z.string().default('mailto:admin@example.com'),
   /** Secreto para que un cron externo llame a /api/internal/tick (opcional, >= 24 caracteres). */
   CRON_SECRET: z.string().min(24).optional(),
+  /** Límite diario de llamadas a modelos de IA (control de costes). */
+  AI_DAILY_LIMIT: z.coerce.number().int().min(1).max(1000).default(60),
 });
 
 export type Env = z.infer<typeof schema>;

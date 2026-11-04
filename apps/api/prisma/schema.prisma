@@ -73,6 +73,9 @@ model User {
   conversations AIConversation[]
   aiConfigs    AIProviderConfig[]
   aiKeys       AIProviderKey[]
+  aiUsage      AIUsage[]
+  aiCache      AICache[]
+  menus        WeeklyMenu[]
   healthSync   HealthSyncRecord[]
 }
 
@@ -436,4 +439,38 @@ model HealthSyncRecord {
   syncedAt  DateTime @default(now()) @db.Timestamptz
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([userId, dataType, externalId])
+}
+
+// Control de costes: llamadas y tokens por día y tarea.
+model AIUsage {
+  id        String   @id @default(cuid())
+  userId    String
+  day       DateTime @db.Date
+  task      AITask
+  calls     Int      @default(0)
+  tokensIn  Int      @default(0)
+  tokensOut Int      @default(0)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, day, task])
+}
+
+// Respuestas de IA reutilizables (misma petición normalizada) para evitar llamadas repetidas.
+model AICache {
+  id        String   @id @default(cuid())
+  userId    String
+  key       String
+  response  String
+  expiresAt DateTime @db.Timestamptz
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, key])
+}
+
+model WeeklyMenu {
+  id        String   @id @default(cuid())
+  userId    String
+  createdAt DateTime @default(now()) @db.Timestamptz
+  menu      Json
+  warnings  String[]
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, createdAt])
 }

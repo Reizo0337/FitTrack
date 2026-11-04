@@ -81,7 +81,7 @@ export function minutesBetween(fromIso: string, toIso: string): number | null {
   return m > 0 && m <= 1440 ? m : null;
 }
 
-export const reminderKinds = ['WAKE', 'WATER', 'BREAKFAST', 'LUNCH', 'DINNER', 'WALK', 'LOG_DINNER', 'BEDTIME', 'WEIGH_IN'] as const;
+export const reminderKinds = ['WAKE', 'WATER', 'BREAKFAST', 'LUNCH', 'DINNER', 'WALK', 'LOG_DINNER', 'BEDTIME', 'WEIGH_IN', 'WEEKLY_REPORT'] as const;
 export const reminderSchema = z.object({
   kind: z.enum(reminderKinds),
   enabled: z.boolean(),

@@ -4,3 +4,4 @@ export * from './schemas';
 export * from './food';
 export * from './health';
 export * from './stats';
+export * from './insights';

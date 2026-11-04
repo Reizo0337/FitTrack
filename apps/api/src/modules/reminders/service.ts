@@ -24,6 +24,7 @@ const MSG: Record<string, { title: string; body: string; url: string }> = {
   LOG_DINNER: { title: 'Cierre del día', body: 'Completa el registro de hoy para ver tu resumen.', url: '/food' },
   WALK: { title: 'Un paseo', body: 'Hoy llevas pocos pasos; un paseo corto suma.', url: '/activity' },
   BEDTIME: { title: 'Hora de descansar', body: 'Si te acuestas ya, registra tu hora de acostarte mañana.', url: '/activity' },
+  WEEKLY_REPORT: { title: 'Informe semanal', body: 'Tu resumen de la semana está listo.', url: '/ai' },
   WEIGH_IN: { title: 'Pesaje', body: 'Hoy toca pesarte (mejor por la mañana, en ayunas).', url: '/progress' },
 };
 
@@ -48,7 +49,7 @@ async function conditionMet(db: PrismaClient, userId: string, r: Reminder, date:
       return steps == null || steps < WALK_STEPS_THRESHOLD;
     }
     case 'WEIGH_IN': return (await db.weightEntry.count({ where: { userId, localDate: day } })) === 0;
-    case 'BEDTIME': return true;
+    case 'BEDTIME': case 'WEEKLY_REPORT': return true;
     default: return false;
   }
 }

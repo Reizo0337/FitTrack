@@ -16,6 +16,9 @@ import { weightRoutes } from './modules/weight/routes';
 import { activityRoutes } from './modules/activity/routes';
 import { healthRoutes } from './modules/health/routes';
 import { reminderRoutes } from './modules/reminders/routes';
+import { aiRoutes } from './modules/ai/routes';
+import { insightRoutes } from './modules/insights/routes';
+import { AIError } from './ai/service';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -62,6 +65,7 @@ export async function buildApp(env: Env, prisma: PrismaClient, deps: { fetch?: t
   });
 
   app.setErrorHandler((err, _req, reply) => {
+    if (err instanceof AIError) return reply.code(err.status).send({ error: err.code, message: err.message });
     if (err instanceof ZodError) return reply.code(400).send({ error: 'VALIDATION', issues: err.issues });
     const e = err as { statusCode?: number; message: string };
     if (e.statusCode && e.statusCode < 500) return reply.code(e.statusCode).send({ error: e.message });
@@ -79,6 +83,8 @@ export async function buildApp(env: Env, prisma: PrismaClient, deps: { fetch?: t
   await app.register(activityRoutes, { prefix: '/api/activity' });
   await app.register(healthRoutes, { prefix: '/api/health' });
   await app.register(reminderRoutes, { prefix: '/api' });
+  await app.register(aiRoutes, { prefix: '/api/ai' });
+  await app.register(insightRoutes, { prefix: '/api/insights' });
 
   return app;
 }
