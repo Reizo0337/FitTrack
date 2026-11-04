@@ -9,11 +9,16 @@ import { ZodError } from 'zod';
 import type { Env } from './env';
 import { authRoutes } from './modules/auth/routes';
 import { profileRoutes } from './modules/profile/routes';
+import { dashboardRoutes } from './modules/dashboard/routes';
+import { diaryRoutes } from './modules/diary/routes';
+import { foodRoutes } from './modules/foods/routes';
+import { weightRoutes } from './modules/weight/routes';
 
 declare module 'fastify' {
   interface FastifyInstance {
     prisma: PrismaClient;
     env: Env;
+    fetchImpl: typeof fetch;
     authenticate: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }
@@ -24,7 +29,7 @@ declare module '@fastify/jwt' {
   }
 }
 
-export async function buildApp(env: Env, prisma: PrismaClient) {
+export async function buildApp(env: Env, prisma: PrismaClient, deps: { fetch?: typeof fetch } = {}) {
   const app = Fastify({
     logger: env.NODE_ENV === 'test' ? false : { level: 'info', redact: ['req.headers.authorization', 'req.headers.cookie'] },
     bodyLimit: 1_000_000,
@@ -32,6 +37,7 @@ export async function buildApp(env: Env, prisma: PrismaClient) {
 
   app.decorate('prisma', prisma);
   app.decorate('env', env);
+  app.decorate('fetchImpl', deps.fetch ?? fetch);
 
   await app.register(helmet);
   await app.register(cors, {
@@ -61,6 +67,10 @@ export async function buildApp(env: Env, prisma: PrismaClient) {
   app.get('/api/health', async () => ({ ok: true }));
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(profileRoutes, { prefix: '/api/profile' });
+  await app.register(foodRoutes, { prefix: '/api/foods' });
+  await app.register(diaryRoutes, { prefix: '/api/diary' });
+  await app.register(weightRoutes, { prefix: '/api/weight' });
+  await app.register(dashboardRoutes, { prefix: '/api/dashboard' });
 
   return app;
 }

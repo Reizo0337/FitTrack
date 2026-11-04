@@ -6,6 +6,7 @@ import { hashPassword } from './security';
 
 type SeedProduct = {
   name: string; brand: string; barcode: string | null; per100g: Nutrients; servingG: number; servingName: string;
+  maxServingsPerDay?: number; guidanceNote?: string;
 };
 
 const seedPath = fileURLToPath(new URL('../data/products.seed.json', import.meta.url));
@@ -16,7 +17,8 @@ export async function seedProducts(prisma: PrismaClient, userId: string) {
     const data = {
       name: p.name, brand: p.brand, kcal100: p.per100g.kcal, protein100: p.per100g.protein, carbs100: p.per100g.carbs,
       fat100: p.per100g.fat, satFat100: p.per100g.satFat, fiber100: p.per100g.fiber, sugars100: p.per100g.sugars,
-      salt100: p.per100g.salt, servingG: p.servingG, servingName: p.servingName, source: 'SEED' as const, isFavorite: true,
+      salt100: p.per100g.salt, servingG: p.servingG, servingName: p.servingName,
+      maxServingsPerDay: p.maxServingsPerDay ?? null, guidanceNote: p.guidanceNote ?? null, source: 'SEED' as const, isFavorite: true,
     };
     const existing = await prisma.foodProduct.findFirst({ where: { userId, name: p.name, source: 'SEED' } });
     if (existing) await prisma.foodProduct.update({ where: { id: existing.id }, data });

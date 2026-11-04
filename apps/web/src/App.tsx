@@ -1,7 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { NavLink, Route, Routes } from 'react-router-dom';
-import { api, login, logout, restoreSession } from './api';
+import { login, logout, restoreSession } from './api';
+import { AppProvider, useApp } from './ctx';
+import { Food } from './pages/Food';
 import { Home } from './pages/Home';
+import { Progress } from './pages/Progress';
 import { Soon } from './pages/Soon';
 
 function Login({ onDone }: { onDone: () => void }) {
@@ -45,6 +48,14 @@ const tabs = [
   { to: '/ai', label: 'IA', icon: '✨' },
 ];
 
+function ScanFab() {
+  const { openAdd } = useApp();
+  return (
+    <button onClick={() => openAdd({ tab: 'scan' })} aria-label="Escanear código de barras"
+      className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 z-10 flex size-14 items-center justify-center rounded-full bg-accent text-2xl shadow-lg active:scale-95">▮▯▮</button>
+  );
+}
+
 export function App() {
   const [state, setState] = useState<'loading' | 'out' | 'in'>('loading');
   useEffect(() => {
@@ -60,16 +71,17 @@ export function App() {
   };
 
   return (
+    <AppProvider>
     <div className="mx-auto min-h-screen max-w-2xl px-4 pb-28 pt-[max(1rem,env(safe-area-inset-top))]">
       <header className="mb-4 flex justify-end gap-2 text-sm">
         <button onClick={toggleTheme} className="rounded-lg px-3 py-1 text-slate-500" aria-label="Cambiar tema claro/oscuro">🌓</button>
         <button onClick={async () => { await logout(); setState('out'); }} className="rounded-lg px-3 py-1 text-slate-500">Salir</button>
       </header>
       <Routes>
-        <Route path="/" element={<Home fetchProfile={() => api('/profile')} />} />
-        <Route path="/food" element={<Soon title="Alimentación" phase="Fase 3: diario, buscador, escáner y Prozis" />} />
-        <Route path="/activity" element={<Soon title="Actividad" phase="Fase 3-4: Apple Health y sueño" />} />
-        <Route path="/progress" element={<Soon title="Progreso" phase="Fase 3: peso, medidas y gráficas" />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/food" element={<Food />} />
+        <Route path="/activity" element={<Soon title="Actividad" phase="Fase 4: Apple Health y sueño" />} />
+        <Route path="/progress" element={<Progress />} />
         <Route path="/ai" element={<Soon title="IA" phase="Fase 5: nutricionista y menús" />} />
       </Routes>
       <nav className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-slate-800 dark:bg-[#0b0f14]/90">
@@ -84,6 +96,8 @@ export function App() {
           ))}
         </ul>
       </nav>
+      <ScanFab />
     </div>
+    </AppProvider>
   );
 }

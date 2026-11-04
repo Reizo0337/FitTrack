@@ -6,6 +6,7 @@
     "per100g": { "kcal": 384, "protein": 42, "carbs": 33, "fat": 9, "satFat": 2.4, "fiber": 1.7, "sugars": 2.5, "salt": 1 },
     "servingG": 60,
     "servingName": "1 batido (60 g)",
-    "manufacturerGuidance": { "maxReplacementsPerDay": 2, "note": "Sustituir dos comidas al día durante el control de peso y una en mantenimiento. El resto de la dieta debe aportar verduras, fruta, grasas saludables y suficiente fibra." }
+    "maxServingsPerDay": 2,
+    "guidanceNote": "El envase recomienda sustituir dos comidas al día para el control de peso y una en mantenimiento. El resto de la dieta debe aportar verduras, fruta, grasas saludables y fibra: que el producto lleve vitaminas y minerales no garantiza que cualquier combinación de alimentos sea completa."
   }
 ]

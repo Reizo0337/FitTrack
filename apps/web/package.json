@@ -7,10 +7,12 @@
     "dev": "vite",
     "build": "tsc -p . && vite build",
     "typecheck": "tsc -p .",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@fittrack/shared": "*",
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0"

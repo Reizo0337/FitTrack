@@ -71,6 +71,17 @@ export function movingAverage(values: (number | null)[], window = 7): (number | 
   });
 }
 
+/** Media de los últimos `days` días naturales (incluido el actual) para cada punto. Sin inventar huecos. */
+export function rollingAverageByDate(points: { date: string; value: number }[], days = 7) {
+  const ms = 86400_000;
+  const t = (d: string) => Date.parse(`${d}T00:00:00Z`);
+  return points.map((p) => {
+    const win = points.filter((q) => t(q.date) <= t(p.date) && t(q.date) > t(p.date) - days * ms);
+    const avg = win.reduce((a, b) => a + b.value, 0) / win.length;
+    return { date: p.date, value: p.value, avg: Math.round(avg * 100) / 100 };
+  });
+}
+
 export const ageFromBirthDate = (birth: Date, now = new Date()) => {
   let a = now.getFullYear() - birth.getFullYear();
   const m = now.getMonth() - birth.getMonth();

@@ -200,6 +200,9 @@ model FoodProduct {
   salt100   Float    @default(0)
   servingG  Float?   // tamaño de ración declarado; NUNCA se asume que igual a 100 g
   servingName String?
+  // Indicaciones del fabricante (p. ej. sustitutivo de comida): se comprueban en el diario.
+  maxServingsPerDay Float?
+  guidanceNote String?
   isFavorite Boolean @default(false)
   source    DataSource @default(MANUAL)
   usageCount Int     @default(0)

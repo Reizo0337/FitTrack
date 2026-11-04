@@ -7,11 +7,20 @@ export class ApiError extends Error {
   }
 }
 
-async function refresh(): Promise<boolean> {
-  const r = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
-  if (!r.ok) return false;
-  accessToken = ((await r.json()) as { accessToken: string }).accessToken;
-  return true;
+// El refresh token rota en cada uso: las llamadas simultáneas deben compartir UNA sola petición.
+let inflight: Promise<boolean> | null = null;
+function refresh(): Promise<boolean> {
+  inflight ??= (async () => {
+    try {
+      const r = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
+      if (!r.ok) return false;
+      accessToken = ((await r.json()) as { accessToken: string }).accessToken;
+      return true;
+    } finally {
+      setTimeout(() => { inflight = null; }, 0);
+    }
+  })();
+  return inflight;
 }
 
 export async function api<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
