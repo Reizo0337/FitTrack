@@ -18,7 +18,7 @@ export const friendly = (e: unknown) => {
 export function AIError({ e }: { e: unknown }) {
   if (!e) return null;
   const code = e instanceof ApiError ? e.code : '';
-  const fixable = code === 'AI_CONSENT_REQUIRED' || code === 'AI_KEY_MISSING' || code === 'AI_PROVIDER_AUTH';
+  const fixable = code === 'AI_CONSENT_REQUIRED' || code === 'AI_KEY_MISSING' || code === 'AI_PROVIDER_AUTH' || code === 'AI_MODEL_NOT_FOUND';
   return <Notice tone="danger">{friendly(e)} {fixable && <Link to="/settings#ia" className="font-semibold underline">Ir a Ajustes</Link>}</Notice>;
 }
 

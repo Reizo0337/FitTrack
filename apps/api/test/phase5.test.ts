@@ -64,6 +64,21 @@ describe('configuración, consentimiento y claves', () => {
   });
 });
 
+describe('errores del proveedor con causa clara', () => {
+  it('404 = modelo no disponible (con el nombre del modelo) y 402 = sin crédito', async () => {
+    replies = [{ status: 404 }];
+    const a = await call('POST', '/api/ai/food/parse', { text: 'una manzana', date: DAY });
+    expect(a.statusCode).toBe(404);
+    expect(a.json().error).toBe('AI_MODEL_NOT_FOUND');
+    expect(a.json().message).toMatch(/claude-haiku-5-5/);
+    replies = [{ status: 402 }];
+    const b = await call('POST', '/api/ai/food/parse', { text: 'una manzana', date: DAY });
+    expect(b.statusCode).toBe(402);
+    expect(b.json().error).toBe('AI_PROVIDER_BILLING');
+    expect(a.body + b.body).not.toContain(KEY);
+  });
+});
+
 describe('registro de comidas por texto', () => {
   it('interpreta, marca como estimación y marca incoherencias; solo envía el texto', async () => {
     replies = [JSON.stringify({ items: [item(), item({ name: 'Humo', grams: 100, kcal: 900, protein: 1, carbs: 1, fat: 1 })], notes: null })];

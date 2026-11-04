@@ -5,7 +5,7 @@ export type CompleteArgs = { apiKey: string; model: string; system: string; mess
 export type Completion = { text: string; tokensIn: number; tokensOut: number };
 
 export class ProviderError extends Error {
-  constructor(public kind: 'auth' | 'rate' | 'other', public status: number) {
+  constructor(public kind: 'auth' | 'rate' | 'billing' | 'model' | 'other', public status: number) {
     super(`provider_${kind}_${status}`);
   }
 }
@@ -13,7 +13,7 @@ export class ProviderError extends Error {
 /** Nunca se incluye la clave ni el cuerpo de la respuesta en el error. */
 async function post(f: typeof fetch, url: string, headers: Record<string, string>, body: unknown): Promise<unknown> {
   const r = await f(url, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body), signal: AbortSignal.timeout(90_000) });
-  if (!r.ok) throw new ProviderError(r.status === 401 || r.status === 403 ? 'auth' : r.status === 429 ? 'rate' : 'other', r.status);
+  if (!r.ok) throw new ProviderError(r.status === 401 || r.status === 403 ? 'auth' : r.status === 429 ? 'rate' : r.status === 402 ? 'billing' : r.status === 404 ? 'model' : 'other', r.status);
   return r.json();
 }
 
@@ -49,5 +49,6 @@ export const ADAPTERS: Record<AIProvider, Adapter> = { ANTHROPIC: anthropic, OPE
 export const DEFAULT_MODELS: Record<AIProvider, Record<AITask, string>> = {
   ANTHROPIC: { NUTRITIONIST: 'claude-sonnet-5-5', FOOD_RECOGNITION: 'claude-haiku-5-5', WEEKLY_ANALYSIS: 'claude-sonnet-5-5' },
   OPENAI: { NUTRITIONIST: 'gpt-4o', FOOD_RECOGNITION: 'gpt-4o-mini', WEEKLY_ANALYSIS: 'gpt-4o' },
-  GEMINI: { NUTRITIONIST: 'gemini-2.0-flash', FOOD_RECOGNITION: 'gemini-2.0-flash', WEEKLY_ANALYSIS: 'gemini-2.0-flash' },
+  // Google retira modelos a menudo (2.0 y 2.5 ya no están disponibles para cuentas nuevas).
+  GEMINI: { NUTRITIONIST: 'gemini-3.5-flash', FOOD_RECOGNITION: 'gemini-3.5-flash-lite', WEEKLY_ANALYSIS: 'gemini-3.5-flash' },
 };

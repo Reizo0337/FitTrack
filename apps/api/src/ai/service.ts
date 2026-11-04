@@ -41,6 +41,8 @@ async function call(d: AIDeps, task: AITask, g: Awaited<ReturnType<typeof guard>
     if (e instanceof ProviderError) {
       if (e.kind === 'auth') throw new AIError(502, 'AI_PROVIDER_AUTH', 'El proveedor rechazó la clave API. Revísala en Ajustes.');
       if (e.kind === 'rate') throw new AIError(503, 'AI_PROVIDER_BUSY', 'El proveedor está limitando las peticiones. Inténtalo en un rato.');
+      if (e.kind === 'billing') throw new AIError(402, 'AI_PROVIDER_BILLING', 'Tu cuenta del proveedor no tiene crédito o la facturación no está activa. Añade saldo en su consola y vuelve a probar.');
+      if (e.kind === 'model') throw new AIError(404, 'AI_MODEL_NOT_FOUND', `El modelo «${g.model}» no está disponible para tu cuenta (puede estar retirado). Cámbialo en Ajustes → Asistente de IA.`);
       throw new AIError(502, 'AI_PROVIDER_ERROR', `Error del proveedor (${e.status}).`);
     }
     throw new AIError(502, 'AI_PROVIDER_ERROR', 'No se pudo contactar con el proveedor de IA.');
