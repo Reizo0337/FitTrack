@@ -93,6 +93,9 @@ body {
   overflow-x: hidden;
   overscroll-behavior-y: none;
 }
+/* Barras de scroll ocultas (el scroll sigue funcionando) */
+* { scrollbar-width: none; }
+*::-webkit-scrollbar { display: none; }
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
