@@ -96,6 +96,7 @@ export const aiWeeklyNarrative = z.object({
 export const recommendRequest = z.object({
   date: localDate,
   category: z.enum(['economica', 'rapida', 'facil', 'alta_proteina', 'baja_caloria', 'receta']).optional(),
+  meal: z.enum(MEAL_IDS).optional(),
   budgetEur: z.number().min(0).max(100).optional(),
   available: z.array(z.string().max(60)).max(30).optional(),
 });
@@ -110,3 +111,13 @@ export const aiConfigRequest = z.object({
   items: z.array(z.object({ task: z.enum(['NUTRITIONIST', 'FOOD_RECOGNITION', 'WEEKLY_ANALYSIS']), provider: z.enum(['ANTHROPIC', 'GEMINI', 'OPENAI']), model: z.string().trim().min(2).max(80).regex(/^[\w.\-:/]+$/) })).max(3),
 });
 export const aiKeyRequest = z.object({ provider: z.enum(['ANTHROPIC', 'GEMINI', 'OPENAI']), apiKey: z.string().trim().min(10).max(300) });
+
+/** Escaneo de despensa por foto: imágenes ya reducidas en el cliente (base64, sin prefijo data:). */
+export const pantryScanRequest = z.object({
+  images: z.array(z.object({ mime: z.enum(['image/jpeg', 'image/png', 'image/webp']), data: z.string().min(100).max(2_500_000) })).min(1).max(4),
+});
+export const aiPantryScan = z.object({
+  items: z.array(z.object({ name: z.string().trim().min(2).max(60), quantity: z.string().max(40).nullish() })).max(60),
+  notes: z.string().max(300).nullish(),
+});
+export const pantryBulkSchema = z.object({ names: z.array(z.string().trim().min(2).max(60)).min(1).max(60) });

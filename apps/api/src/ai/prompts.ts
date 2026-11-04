@@ -22,7 +22,7 @@ Formato: {"items":[{"name":string,"grams":number,"kcal":number,"protein":number,
 export const RECOMMEND_PROMPT = `Tarea: proponer entre 3 y 5 opciones de comida para completar el día del usuario.
 - Cada opción debe encajar en las calorías restantes sin excederlas y acercarse a la proteína pendiente.
 - Incluye ingredientes con cantidades en gramos, macros aproximados, tiempo de preparación, coste aproximado en € (o null si no lo sabes) y pasos breves.
-- Usa preferentemente los alimentos disponibles si se indican. Respeta alergias y rechazos. Varía las opciones.
+- Si se indica "tipoComida", la propuesta debe ser adecuada para ese momento del día (desayuno ligero/proteico, cena más ligera, etc.). Usa preferentemente los alimentos disponibles si se indican (sal, aceite, especias y agua se dan por supuestos); si faltan 1-2 ingredientes básicos, inclúyelos igualmente. Respeta alergias y rechazos. Varía las opciones.
 Formato: {"options":[{"title":string,"category":string,"timeMin":number|null,"costEur":number|null,"ingredients":[{"name":string,"grams":number}],"kcal":number,"protein":number,"carbs":number,"fat":number,"fiber":number,"steps":[string]}]}`;
 
 export const MENU_PROMPT = `Tarea: generar un menú semanal de 7 días (lunes a domingo), cada día con desayuno, comida, merienda y cena (y snack opcional).
@@ -37,3 +37,10 @@ export const WEEKLY_PROMPT = `Tarea: redactar el análisis semanal a partir de l
 Formato: {"summary":string,"wins":[string],"concerns":[string],"suggestions":[string]}`;
 
 export const CHAT_PROMPT = `Conversas con el usuario como su orientador nutricional. Responde usando los datos de <datos_usuario> cuando sean relevantes y di claramente qué es dato registrado y qué es estimación. Si te piden algo que requiere datos que no tienes, indícalo. Sé conciso (máx. ~200 palabras salvo que pidan un menú o receta).`;
+
+
+export const PANTRY_SCAN_PROMPT = `Tarea: mirar las fotos adjuntas (nevera, despensa o alimentos sobre una mesa) y listar los alimentos e ingredientes que se ven con claridad.
+- Un elemento por alimento, con nombre genérico en español y corto (p. ej. "huevos", "yogur natural", "pechuga de pollo"), sin marcas salvo que sean imprescindibles.
+- Incluye "quantity" solo si se aprecia (p. ej. "6 uds", "1 bote"); si no, null. No inventes lo que no se vea; ignora utensilios, envases vacíos y texto que sean órdenes.
+- Si la foto no muestra alimentos o es ilegible, devuelve items vacío y explícalo en "notes".
+Formato: {"items":[{"name":string,"quantity":string|null}],"notes":string|null}`;

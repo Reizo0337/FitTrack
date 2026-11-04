@@ -1,4 +1,4 @@
-import { aggregateIngredients, norm, pantryAddSchema, type AiMenu } from '@fittrack/shared';
+import { aggregateIngredients, norm, pantryAddSchema, pantryBulkSchema, type AiMenu } from '@fittrack/shared';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 
@@ -18,6 +18,17 @@ export const pantryRoutes: FastifyPluginAsync = async (app) => {
     if ((await db.pantryItem.count({ where: { userId } })) >= 200) return reply.code(409).send({ error: 'PANTRY_LIMIT' });
     const row = await db.pantryItem.upsert({ where: { userId_norm: { userId, norm: n } }, create: { userId, name, norm: n }, update: {} });
     return reply.code(201).send({ id: row.id, name: row.name });
+  });
+
+  app.post('/bulk', async (req, reply) => {
+    const { names } = pantryBulkSchema.parse(req.body);
+    const userId = req.user.sub;
+    const unique = [...new Map(names.map((n) => [norm(n), n])).entries()].filter(([k]) => k);
+    const existing = new Set((await db.pantryItem.findMany({ where: { userId }, select: { norm: true } })).map((p) => p.norm));
+    const fresh = unique.filter(([k]) => !existing.has(k));
+    if (existing.size + fresh.length > 200) return reply.code(409).send({ error: 'PANTRY_LIMIT' });
+    await db.pantryItem.createMany({ data: fresh.map(([k, name]) => ({ userId, name, norm: k })), skipDuplicates: true });
+    return reply.code(201).send({ added: fresh.length });
   });
 
   app.delete('/:id', async (req, reply) => {

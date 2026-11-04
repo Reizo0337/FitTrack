@@ -1,6 +1,7 @@
 import type { AIProvider, AITask } from '@prisma/client';
 
-export type ChatMsg = { role: 'user' | 'assistant'; content: string };
+export type ImageIn = { mime: string; data: string }; // data = base64 sin prefijo
+export type ChatMsg = { role: 'user' | 'assistant'; content: string; images?: ImageIn[] };
 export type CompleteArgs = { apiKey: string; model: string; system: string; messages: ChatMsg[]; json: boolean; maxTokens: number; fetchImpl: typeof fetch };
 export type Completion = { text: string; tokensIn: number; tokensOut: number };
 
@@ -21,14 +22,15 @@ type Adapter = (a: CompleteArgs) => Promise<Completion>;
 
 const anthropic: Adapter = async (a) => {
   const j = (await post(a.fetchImpl, 'https://api.anthropic.com/v1/messages', { 'x-api-key': a.apiKey, 'anthropic-version': '2023-06-01' }, {
-    model: a.model, max_tokens: a.maxTokens, system: a.system, messages: a.messages,
+    model: a.model, max_tokens: a.maxTokens, system: a.system,
+    messages: a.messages.map((m) => ({ role: m.role, content: m.images?.length ? [...m.images.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mime, data: i.data } })), { type: 'text', text: m.content }] : m.content })),
   })) as { content?: { type: string; text?: string }[]; usage?: { input_tokens?: number; output_tokens?: number } };
   return { text: (j.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join(''), tokensIn: j.usage?.input_tokens ?? 0, tokensOut: j.usage?.output_tokens ?? 0 };
 };
 
 const openai: Adapter = async (a) => {
   const j = (await post(a.fetchImpl, 'https://api.openai.com/v1/chat/completions', { authorization: `Bearer ${a.apiKey}` }, {
-    model: a.model, max_tokens: a.maxTokens, messages: [{ role: 'system', content: a.system }, ...a.messages],
+    model: a.model, max_tokens: a.maxTokens, messages: [{ role: 'system', content: a.system }, ...a.messages.map((m) => ({ role: m.role, content: m.images?.length ? [...m.images.map((i) => ({ type: 'image_url', image_url: { url: `data:${i.mime};base64,${i.data}` } })), { type: 'text', text: m.content }] : m.content }))],
     ...(a.json ? { response_format: { type: 'json_object' } } : {}),
   })) as { choices?: { message?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
   return { text: j.choices?.[0]?.message?.content ?? '', tokensIn: j.usage?.prompt_tokens ?? 0, tokensOut: j.usage?.completion_tokens ?? 0 };
@@ -37,7 +39,7 @@ const openai: Adapter = async (a) => {
 const gemini: Adapter = async (a) => {
   const j = (await post(a.fetchImpl, `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(a.model)}:generateContent`, { 'x-goog-api-key': a.apiKey }, {
     systemInstruction: { parts: [{ text: a.system }] },
-    contents: a.messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
+    contents: a.messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [...(m.images ?? []).map((i) => ({ inlineData: { mimeType: i.mime, data: i.data } })), { text: m.content }] })),
     generationConfig: { maxOutputTokens: a.maxTokens, ...(a.json ? { responseMimeType: 'application/json' } : {}) },
   })) as { candidates?: { content?: { parts?: { text?: string }[] } }[]; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } };
   return { text: (j.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? '').join(''), tokensIn: j.usageMetadata?.promptTokenCount ?? 0, tokensOut: j.usageMetadata?.candidatesTokenCount ?? 0 };

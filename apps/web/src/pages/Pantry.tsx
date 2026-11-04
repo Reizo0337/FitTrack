@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import { PageHeader } from '../components/PageHeader';
+import { PantryCook, PantryScan } from '../components/PantryAI';
 import { useData } from '../hooks';
 import { useToast } from '../ui/overlays';
 import { Button, Card, EmptyState, ErrorState, FormField, LoadingState, Notice, SectionHeader, cx } from '../ui/primitives';
@@ -56,6 +57,11 @@ export function Pantry() {
             )}
           </Card>
         </section>
+
+        <div className="flex flex-col gap-4">
+          <PantryScan onAdded={() => { pantry.reload(); shop.reload(); }} />
+          <PantryCook empty={!pantry.loading && !pantry.data?.items.length} />
+        </div>
 
         <section>
           <SectionHeader title="Lista de la compra" />

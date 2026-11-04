@@ -1,11 +1,11 @@
 import {
-  aiConfigRequest, aiFoodParse, aiKeyRequest, aiMenu, aiRecommend, aiWeeklyNarrative, chatRequest, findViolations, foodConfirmRequest,
+  aiConfigRequest, aiFoodParse, aiPantryScan, pantryScanRequest, aiKeyRequest, aiMenu, aiRecommend, aiWeeklyNarrative, chatRequest, findViolations, foodConfirmRequest,
   foodParseRequest, localDate, menuRequest, nutrientsLookInconsistent, recommendRequest, type AiMenu,
 } from '@fittrack/shared';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { buildContext, weeklyStats } from '../../ai/context';
-import { CHAT_PROMPT, FOOD_PARSE_PROMPT, MENU_PROMPT, RECOMMEND_PROMPT, WEEKLY_PROMPT } from '../../ai/prompts';
+import { CHAT_PROMPT, FOOD_PARSE_PROMPT, MENU_PROMPT, PANTRY_SCAN_PROMPT, RECOMMEND_PROMPT, WEEKLY_PROMPT } from '../../ai/prompts';
 import { DEFAULT_MODELS } from '../../ai/providers';
 import { cacheKey, getTaskConfig, runJson, runText, type AIDeps } from '../../ai/service';
 import { toDbDate } from '../../lib/dates';
@@ -86,6 +86,16 @@ export const aiRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(201).send({ saved: b.items.length });
   });
 
+  // ---------- Despensa por foto ----------
+  // Las fotos se envían al proveedor solo para esta petición; no se guardan. El usuario revisa la lista antes de añadirla.
+  app.post('/pantry/scan', { bodyLimit: 8_000_000 }, async (req) => {
+    const b = pantryScanRequest.parse(req.body);
+    const { data } = await runJson(deps(req.user.sub), 'FOOD_RECOGNITION', {
+      prompt: PANTRY_SCAN_PROMPT, user: 'Lista los alimentos que ves en las imágenes adjuntas.', schema: aiPantryScan, images: b.images, maxTokens: 1500,
+    });
+    return { items: data.items, notes: data.notes ?? null };
+  });
+
   // ---------- Qué comer ----------
   app.post('/recommend', async (req) => {
     const b = recommendRequest.parse(req.body);
@@ -93,8 +103,8 @@ export const aiRoutes: FastifyPluginAsync = async (app) => {
     const [ctx, who, pantry] = await Promise.all([buildContext(db, userId, b.date, 7), blockedOf(userId), pantryNames(userId)]);
     const available = b.available?.length ? b.available : pantry; // sin indicar nada, se usa la despensa
     const rem = ctx.hoy.restante as Record<string, number>;
-    const key = cacheKey('rec', Math.round((rem.kcal ?? 0) / 50), Math.round((rem.protein ?? 0) / 10), b.category, b.budgetEur, [...available].sort(), who.blocked);
-    const user = wrap('datos_usuario', { ...ctx, petición: { categoria: b.category ?? 'cualquiera', presupuestoEur: b.budgetEur ?? null, alimentosDisponibles: available } });
+    const key = cacheKey('rec', Math.round((rem.kcal ?? 0) / 50), Math.round((rem.protein ?? 0) / 10), b.category, b.meal, b.budgetEur, [...available].sort(), who.blocked);
+    const user = wrap('datos_usuario', { ...ctx, petición: { tipoComida: b.meal ?? 'cualquiera', categoria: b.category ?? 'cualquiera', presupuestoEur: b.budgetEur ?? null, alimentosDisponibles: available } });
     const { data, cached } = await runJson(deps(userId), 'NUTRITIONIST', { prompt: RECOMMEND_PROMPT, user, schema: aiRecommend, maxTokens: 3500, cache: { key, ttlMin: 180 } });
     // Defensa propia: nunca se muestra una opción con ingredientes bloqueados, diga lo que diga el modelo.
     const safe = data.options.filter((o) => findViolations(o.ingredients.map((i) => i.name), who.blocked).length === 0);

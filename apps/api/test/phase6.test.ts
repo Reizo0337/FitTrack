@@ -13,6 +13,7 @@ const prisma = new PrismaClient({ datasources: { db: { url: env.DATABASE_URL } }
 let sentBodies: string[] = [];
 const fake = (async (_u: string, init: RequestInit) => {
   sentBodies.push(String(init.body));
+  if (String(init.body).includes('"type":"image"')) return new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify({ items: [{ name: 'yogur natural', quantity: '4 uds' }, { name: 'tomates', quantity: null }], notes: null }) }], usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200 });
   return new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify({ options: [{ title: 'Tortilla', category: 'facil', ingredients: [{ name: 'Huevos', grams: 120 }], kcal: 300, protein: 25, carbs: 2, fat: 20, fiber: 0, steps: [] }] }) }], usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200 });
 }) as unknown as typeof fetch;
 
@@ -154,6 +155,25 @@ describe('despensa y lista de la compra', () => {
     const r = await call('POST', '/api/ai/recommend', { date: DAY });
     expect(r.statusCode).toBe(200);
     expect(JSON.parse(sentBodies[0]!).messages[0].content).toContain('"alimentosDisponibles":["Arroz","Huevos"]');
+  });
+});
+
+describe('despensa por foto', () => {
+  it('envía la imagen al modelo, devuelve los alimentos y permite añadirlos en bloque sin duplicar', async () => {
+    sentBodies = [];
+    const data = jpeg.toString('base64').padEnd(200, 'A');
+    const r = await call('POST', '/api/ai/pantry/scan', { images: [{ mime: 'image/jpeg', data }] });
+    expect(r.statusCode).toBe(200);
+    expect(r.json().items.map((i: { name: string }) => i.name)).toEqual(['yogur natural', 'tomates']);
+    expect(sentBodies[0]).toContain('"media_type":"image/jpeg"');
+    expect((await call('POST', '/api/ai/pantry/scan', { images: [] })).statusCode).toBe(400);
+    expect((await call('POST', '/api/pantry/bulk', { names: ['Yogur natural', 'tomates', 'TOMATES', 'Arroz'] })).json()).toEqual({ added: 2 });
+    expect((await call('GET', '/api/pantry')).json().items).toHaveLength(4);
+  });
+  it('la recomendación recibe el tipo de comida', async () => {
+    sentBodies = [];
+    await call('POST', '/api/ai/recommend', { date: DAY, meal: 'DINNER' });
+    expect(JSON.parse(sentBodies[0]!).messages[0].content).toContain('"tipoComida":"DINNER"');
   });
 });
 

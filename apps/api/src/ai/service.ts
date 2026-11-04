@@ -4,7 +4,7 @@ import type { ZodType } from 'zod';
 import type { Env } from '../env';
 import { toDbDate } from '../lib/dates';
 import { decryptSecret } from '../security';
-import { ADAPTERS, DEFAULT_MODELS, ProviderError, type ChatMsg, type Completion } from './providers';
+import { ADAPTERS, DEFAULT_MODELS, ProviderError, type ChatMsg, type Completion, type ImageIn } from './providers';
 import { JSON_ONLY, SAFETY_SYSTEM } from './prompts';
 
 export class AIError extends Error {
@@ -65,14 +65,14 @@ export function extractJson(text: string): unknown {
 export const cacheKey = (...parts: unknown[]) => createHash('sha256').update(JSON.stringify(parts)).digest('hex');
 
 /** Llamada con salida JSON validada (1 reintento de reparación) y caché opcional. */
-export async function runJson<T>(d: AIDeps, task: AITask, o: { prompt: string; user: string; schema: ZodType<T, unknown>; maxTokens?: number; cache?: { key: string; ttlMin: number } }): Promise<{ data: T; cached: boolean }> {
+export async function runJson<T>(d: AIDeps, task: AITask, o: { prompt: string; user: string; schema: ZodType<T, unknown>; images?: ImageIn[]; maxTokens?: number; cache?: { key: string; ttlMin: number } }): Promise<{ data: T; cached: boolean }> {
   const g = await guard(d, task);
   if (o.cache) {
     const hit = await d.db.aICache.findUnique({ where: { userId_key: { userId: d.userId, key: o.cache.key } } });
     if (hit && hit.expiresAt > new Date()) return { data: JSON.parse(hit.response) as T, cached: true };
   }
   const system = `${SAFETY_SYSTEM}\n\n${o.prompt}${JSON_ONLY}`;
-  const messages: ChatMsg[] = [{ role: 'user', content: o.user }];
+  const messages: ChatMsg[] = [{ role: 'user', content: o.user, ...(o.images?.length ? { images: o.images } : {}) }];
   let out = await call(d, task, g, system, messages, true, o.maxTokens ?? 3000);
   let parsed = tryParse(out.text, o.schema);
   if (!parsed.ok) {
