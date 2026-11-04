@@ -1,6 +1,6 @@
 import { MEAL_LABELS, MEAL_TYPES, type MealTypeId } from '@fittrack/shared';
 import { Clock } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../../api';
 import { defaultMeal, todayStr, useApp } from '../../ctx';
 import { useToast } from '../../ui/overlays';
@@ -11,12 +11,12 @@ type Option = { title: string; category: string; timeMin?: number | null; costEu
 type Res = { options: Option[]; removedForRestrictions: number; cached: boolean; remaining: Record<string, number> };
 const CATS: [string, string][] = [['', 'Cualquiera'], ['economica', 'Económica'], ['rapida', 'Rápida'], ['facil', 'Fácil'], ['alta_proteina', 'Alta en proteína'], ['baja_caloria', 'Baja en calorías'], ['receta', 'Receta completa']];
 
-export function EatTab() {
+export function EatTab({ preset }: { preset?: { category?: string; budgetEur?: number; available?: string[] } } = {}) {
   const { bump } = useApp();
   const toast = useToast();
-  const [cat, setCat] = useState('');
-  const [budget, setBudget] = useState('');
-  const [avail, setAvail] = useState('');
+  const [cat, setCat] = useState(preset?.category ?? '');
+  const [budget, setBudget] = useState(preset?.budgetEur ? String(preset.budgetEur) : '');
+  const [avail, setAvail] = useState(preset?.available?.join(', ') ?? '');
   const [type, setType] = useState<MealTypeId>(defaultMeal());
   const [res, setRes] = useState<Res | null>(null);
   const [busy, setBusy] = useState(false);
@@ -29,6 +29,9 @@ export function EatTab() {
       setRes(await api<Res>('/ai/recommend', { method: 'POST', body: JSON.stringify({ date: todayStr(), category: cat || undefined, budgetEur: b > 0 ? b : undefined, available: avail.split(',').map((s) => s.trim()).filter(Boolean) }) }));
     } catch (e) { setErr(e); } finally { setBusy(false); }
   }
+  // Pedido desde el chat: sugiere solo, como si hubieras pulsado «Sugerir».
+  const auto = useRef(false);
+  useEffect(() => { if (preset && !auto.current) { auto.current = true; void go(); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
   async function log(o: Option) {
     try {
       await api('/ai/food/confirm', { method: 'POST', body: JSON.stringify({ date: todayStr(), type, items: [{ name: o.title, grams: Math.max(1, Math.round(o.ingredients.reduce((a, i) => a + i.grams, 0))), kcal: o.kcal, protein: o.protein, carbs: o.carbs, fat: o.fat, fiber: o.fiber, satFat: 0, sugars: 0, salt: 0 }] }) });

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../../api';
 import { todayStr } from '../../ctx';
 import { useData } from '../../hooks';
@@ -19,11 +19,14 @@ const v = (x: number | null, u = '', dec = 1) => (x == null ? 'sin datos' : `${(
 const day = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('es', { day: 'numeric', month: 'short' });
 
 /** Informe semanal: las cifras se calculan en el servidor con tus datos reales; la IA solo redacta sobre ellas. */
-export function ReportTab({ aiReady }: { aiReady: boolean }) {
+export function ReportTab({ aiReady, autoAnalyse = false }: { aiReady: boolean; autoAnalyse?: boolean }) {
   const s = useData<Stats>(`/insights/weekly?end=${todayStr()}`);
   const [nar, setNar] = useState<Narrative | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<unknown>();
+  // Pedido desde el chat: redacta el análisis solo, como si hubieras pulsado el botón.
+  const auto = useRef(false);
+  useEffect(() => { if (autoAnalyse && aiReady && !auto.current) { auto.current = true; void analyse(); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function analyse() {
     setBusy(true); setErr(undefined);

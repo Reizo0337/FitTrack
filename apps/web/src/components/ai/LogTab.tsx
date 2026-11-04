@@ -1,6 +1,6 @@
 import { MEAL_LABELS, MEAL_TYPES, type MealTypeId } from '@fittrack/shared';
 import { X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../../api';
 import { defaultMeal, todayStr, useApp } from '../../ctx';
 import { useToast } from '../../ui/overlays';
@@ -12,10 +12,10 @@ const FIELDS: ['kcal' | 'protein' | 'carbs' | 'fat', string][] = [['kcal', 'kcal
 const n = (v: string) => Number(v.replace(',', '.')) || 0;
 
 /** Registro por lenguaje natural: la IA estima, tú revisas y confirmas. Nada se guarda antes. */
-export function LogTab() {
+export function LogTab({ initialText }: { initialText?: string } = {}) {
   const { bump } = useApp();
   const toast = useToast();
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialText ?? '');
   const [type, setType] = useState<MealTypeId>(defaultMeal());
   const [items, setItems] = useState<Item[] | null>(null);
   const [notes, setNotes] = useState<string | null>(null);
@@ -27,6 +27,9 @@ export function LogTab() {
     try { const r = await api<{ items: Item[]; notes: string | null }>('/ai/food/parse', { method: 'POST', body: JSON.stringify({ text, date: todayStr() }) }); setItems(r.items); setNotes(r.notes); }
     catch (e) { setErr(e); } finally { setBusy(false); }
   }
+  // Pedido desde el chat: se interpreta solo, como si hubieras pulsado «Interpretar».
+  const auto = useRef(false);
+  useEffect(() => { if (initialText && !auto.current) { auto.current = true; void parse(); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const upd = (i: number, patch: Partial<Item>) => setItems((xs) => xs!.map((x, k) => (k === i ? { ...x, ...patch } : x)));
   const regram = (i: number, g: number) => setItems((xs) => xs!.map((x, k) => {
     if (k !== i) return x;

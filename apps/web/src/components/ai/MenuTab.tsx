@@ -1,6 +1,6 @@
 import { MEAL_LABELS, type MealTypeId } from '@fittrack/shared';
 import { ShoppingBasket } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api';
 import { useData } from '../../hooks';
@@ -10,10 +10,10 @@ import { AIError } from './shared';
 type Menu = { days: { day: string; meals: { type: MealTypeId; title: string; minutes?: number | null; ingredients: { name: string; grams: number }[]; kcal: number; protein: number; carbs: number; fat: number; fiber: number }[] }[] };
 type Saved = { menu: Menu | null; warnings?: string[]; createdAt?: string };
 
-export function MenuTab() {
+export function MenuTab({ preset }: { preset?: { budgetEur?: number } } = {}) {
   const latest = useData<Saved>('/ai/menu/latest');
   const [fresh, setFresh] = useState<Saved | null>(null);
-  const [budget, setBudget] = useState('');
+  const [budget, setBudget] = useState(preset?.budgetEur ? String(preset.budgetEur) : '');
   const [avail, setAvail] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<unknown>();
@@ -27,6 +27,10 @@ export function MenuTab() {
       setFresh({ menu: r.menu, warnings: r.warnings, createdAt: new Date().toISOString() });
     } catch (e) { setErr(e); } finally { setBusy(false); }
   }
+
+  // Pedido desde el chat: genera solo, como si hubieras pulsado «Generar menú semanal».
+  const auto = useRef(false);
+  useEffect(() => { if (preset && !auto.current) { auto.current = true; void gen(); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex flex-col gap-3">

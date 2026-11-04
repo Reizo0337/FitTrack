@@ -8,6 +8,7 @@ import { Home } from './pages/Home';
 import { BottomNavigation, Sidebar } from './ui/nav';
 import { ToastProvider } from './ui/overlays';
 import { Button, FormField, LoadingState } from './ui/primitives';
+import { useKeyboardViewport } from './ui/viewport';
 
 // Páginas secundarias en carga diferida: el primer arranque descarga menos código.
 const Activity = lazy(() => import('./pages/Activity').then((m) => ({ default: m.Activity })));
@@ -48,7 +49,7 @@ function QuickAddButton() {
   const { openQuick } = useApp();
   return (
     <button onClick={openQuick} aria-label="Registrar comida, peso o escanear"
-      className="fixed right-4 z-20 flex size-14 items-center justify-center rounded-full bg-accent text-accent-ink shadow-[var(--shadow-pop)] transition hover:bg-accent-strong active:scale-95 lg:hidden"
+      className="kb-hide fixed right-4 z-20 flex size-14 items-center justify-center rounded-full bg-accent text-accent-ink shadow-[var(--shadow-pop)] transition hover:bg-accent-strong active:scale-95 lg:hidden"
       style={{ bottom: 'calc(env(safe-area-inset-bottom) + 4.75rem)' }}>
       <Plus className="size-7" strokeWidth={2.25} aria-hidden />
     </button>
@@ -87,6 +88,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
 
 export function App() {
   const [state, setState] = useState<'loading' | 'out' | 'in'>('loading');
+  useKeyboardViewport();
   useEffect(() => { restoreSession().then((ok) => setState(ok ? 'in' : 'out')); }, []);
 
   if (state === 'loading') return <div className="grid min-h-dvh place-items-center" role="status" aria-label="Cargando"><div className="skeleton size-10 !rounded-full" /></div>;

@@ -127,5 +127,5 @@ input, select, textarea { font-size: 16px; } /* 16px evita el zoom automático d
 .pb-safe { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
 .px-safe { padding-left: max(1rem, env(safe-area-inset-left)); padding-right: max(1rem, env(safe-area-inset-right)); }
 
-/* Teclado abierto en el chat: la barra inferior se oculta para que no suba con él. */
-.kb-open nav[aria-label="Principal"] { display: none; }
+/* Teclado abierto (ui/viewport.ts): lo fijo de abajo (barra, botón «+») se oculta para que no suba con él ni tape el campo. */
+.kb-open nav[aria-label="Principal"], .kb-open .kb-hide { display: none; }
