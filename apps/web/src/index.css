@@ -81,7 +81,8 @@
 }
 
 html { -webkit-text-size-adjust: 100%; }
-html, body, #root { min-height: 100%; }
+/* Sin scroll en la ventana: cada pantalla scrollea en su contenedor, y el teclado del móvil no tiene página que deslizar. */
+html, body, #root { height: 100%; overflow: hidden; }
 body {
   background: var(--bg);
   color: var(--ink);
@@ -129,3 +130,10 @@ input, select, textarea { font-size: 16px; } /* 16px evita el zoom automático d
 
 /* Teclado abierto (ui/viewport.ts): lo fijo de abajo (barra, botón «+») se oculta para que no suba con él ni tape el campo. */
 .kb-open nav[aria-label="Principal"], .kb-open .kb-hide { display: none; }
+
+/* Foto del plato: barrido de «análisis» y esquinas que laten */
+@keyframes plate-sweep { 0% { top: 0; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: calc(100% - 3px); opacity: 0; } }
+@keyframes plate-pulse { 0%, 100% { opacity: .55; transform: scale(1); } 50% { opacity: 1; transform: scale(.985); } }
+.plate-sweep { animation: plate-sweep 1.8s ease-in-out infinite; }
+.plate-pulse { animation: plate-pulse 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .plate-sweep, .plate-pulse { animation: none; } }

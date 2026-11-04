@@ -29,7 +29,7 @@ Tipografía: `t-display`, `t-title`, `t-head`, `t-body`, `t-meta`, `t-over`; cif
 - Toda entrada de texto tiene etiqueta (`FormField`/`aria-label`); un solo `h1` por pantalla y sin saltos de nivel.
 
 ## Móvil
-- Entradas a 16 px (evita el zoom automático de iOS). `ui/viewport.ts` (montado en `App`) publica `--vv-h`/`--vv-top` y pone `kb-open` en `<html>` con el teclado abierto: la barra inferior y lo marcado con `kb-hide` (botón «+») se ocultan, `Sheet` se ajusta al área visible y el chat encoge en vez de empujar la página. Lo nuevo con `position: fixed` en la parte baja debe llevar `kb-hide`.
+- Entradas a 16 px (evita el zoom automático de iOS). El teclado **tapa** la página, no la mueve ni la encoge: `html/body` no hacen scroll (cada pantalla scrollea en el contenedor de `Shell`), el meta viewport lleva `interactive-widget=overlays-content` y `ui/viewport.ts` (montado en `App`) publica `--kb` (altura del teclado) y `kb-open` en `<html>`. Lo que debe verse sobre el teclado (cuadro del chat, `Sheet`) se levanta con `--kb`; la barra inferior y lo marcado con `kb-hide` (botón «+») se ocultan. No uses scroll de ventana (`window.scrollTo`) en pantallas nuevas.
 - El chat de IA detecta (`detectIntent` en `packages/shared/src/intent.ts`, reglas en español sin coste de IA) cuando pides registrar una comida, ideas de qué comer, el menú semanal o el informe, y abre esa función ejecutándola sola; el resto es conversación normal.
 - Tras enviar un mensaje el foco se queda en el cuadro de texto (el teclado no se cierra); el cuadro crece con lo que escribes hasta 8 rem.
 - Probar siempre en un móvil pequeño y bajo (≈ 360 × 560): ninguna pantalla debe desbordar en horizontal.

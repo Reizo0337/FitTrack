@@ -26,30 +26,17 @@ const TOOLS: { value: Tool; label: string; hint: string; icon: LucideIcon }[] = 
   { value: 'report', label: 'Informe', hint: 'Resumen de tu semana', icon: BarChart3 },
 ];
 
-/**
- * Sigue el viewport visual: con el teclado abierto encoge el chat en vez de empujar la página.
- * La barra inferior se oculta con la clase kb-open que pone ui/viewport.ts.
- */
+/** ¿Hay teclado abierto? (la página no se redimensiona: el teclado la tapa; ver ui/viewport.ts). */
 function useChatViewport() {
-  const [vp, setVp] = useState({ top: 0, height: window.innerHeight, kb: false });
+  const [kb, setKb] = useState(false);
   useEffect(() => {
-    const vv = window.visualViewport;
-    const lock = window.matchMedia('(max-width: 1023px)').matches;
-    const prev = document.body.style.overflow;
-    if (lock) document.body.style.overflow = 'hidden';
-    const update = () => {
-      const h = vv?.height ?? window.innerHeight;
-      const kb = window.innerHeight - h > 120;
-      setVp({ top: vv?.offsetTop ?? 0, height: h, kb });
-    };
+    const update = () => setKb(document.documentElement.classList.contains('kb-open'));
+    const obs = new MutationObserver(update);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     update();
-    vv?.addEventListener('resize', update); vv?.addEventListener('scroll', update); window.addEventListener('resize', update);
-    return () => {
-      vv?.removeEventListener('resize', update); vv?.removeEventListener('scroll', update); window.removeEventListener('resize', update);
-      document.body.style.overflow = prev;
-    };
+    return () => obs.disconnect();
   }, []);
-  return vp;
+  return { kb };
 }
 
 export function AI() {
@@ -166,11 +153,11 @@ function ChatTab({ usage }: { usage: { calls: number } }) {
     toast(on ? 'Modo voz activado: se envía al terminar de hablar y se lee la respuesta. El audio lo procesa el servicio de voz de tu navegador.' : 'Modo voz desactivado', 'info');
   }
 
-  const style = { '--vv-top': `${vp.top}px`, '--vv-h': `${vp.height}px`, '--nav-h': vp.kb ? '0px' : 'calc(3.25rem + env(safe-area-inset-bottom))' } as CSSProperties;
+  const style = { '--nav-h': 'calc(3.25rem + env(safe-area-inset-bottom))' } as CSSProperties;
   const active = TOOLS.find((t) => t.value === tool);
 
   return (
-    <div style={style} className="max-lg:fixed max-lg:inset-x-0 max-lg:top-[var(--vv-top)] max-lg:z-20 max-lg:h-[calc(var(--vv-h)-var(--nav-h))] max-lg:bg-bg max-lg:px-4 lg:h-[calc(100dvh-4rem)]">
+    <div style={style} className="max-lg:fixed max-lg:inset-x-0 max-lg:top-0 max-lg:z-20 max-lg:h-[calc(100dvh-var(--nav-h))] max-lg:bg-bg max-lg:px-4 lg:h-[calc(100dvh-4rem)]">
       <div className="mx-auto flex h-full max-w-2xl flex-col">
         <header className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-line pb-2 max-lg:pt-[max(0.5rem,env(safe-area-inset-top))]">
           {active ? (
@@ -180,7 +167,7 @@ function ChatTab({ usage }: { usage: { calls: number } }) {
           {active && <span className="w-16" aria-hidden />}
         </header>
 
-        <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-3">
+        <div ref={scroller} style={{ paddingBottom: 'max(0.75rem, calc(var(--kb, 0px) - var(--nav-h)))' }} className="min-h-0 flex-1 overflow-y-auto overscroll-contain pt-3">
           {active ? (
             <>
               {tool === 'log' && <LogTab initialText={preset?.tool === 'log' ? preset.text : undefined} />}
@@ -210,7 +197,8 @@ function ChatTab({ usage }: { usage: { calls: number } }) {
           )}
         </div>
 
-      <div className={cx('shrink-0 border-t border-line bg-bg pb-2 pt-2', active && 'hidden')}>
+      {/* El teclado tapa la página (no la encoge): solo este cuadro sube lo justo para quedar sobre él */}
+      <div style={{ transform: 'translateY(calc(-1 * max(0px, var(--kb, 0px) - var(--nav-h))))' }} className={cx('relative z-10 shrink-0 border-t border-line bg-bg pb-2 pt-2', active && 'hidden')}>
         {msgs.length > 0 && !vp.kb && (
           <ul className="mb-2 flex items-center gap-2.5 [@media(max-height:520px)]:hidden" aria-label="Funciones">
             {TOOLS.map((t) => <li key={t.value}><ToolCircle t={t} onOpen={() => { setPreset(null); setTool(t.value); }} /></li>)}

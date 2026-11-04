@@ -28,7 +28,7 @@ export function Sheet({ open, onClose, title, children, size = 'md' }: { open: b
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-x-0 top-[var(--vv-top,0px)] z-40 flex h-[var(--vv-h,100dvh)] items-end justify-center md:items-center" role="presentation">
+    <div className="fixed inset-0 z-40 flex pb-[var(--kb,0px)] items-end justify-center md:items-center" role="presentation">
       <div className="fade-in absolute inset-0 bg-[var(--scrim)]" onClick={onClose} aria-hidden />
       <div ref={ref} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}
         className={cx('sheet-in relative flex max-h-[92dvh] w-full flex-col rounded-t-[24px] border border-line bg-bg shadow-[var(--shadow-pop)] outline-none md:max-h-[86dvh] md:rounded-[24px]', size === 'lg' ? 'md:max-w-2xl' : 'md:max-w-lg')}>

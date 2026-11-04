@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react';
-import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { login, logout, restoreSession } from './api';
 import { AppProvider, useApp } from './ctx';
@@ -29,7 +29,7 @@ function Login({ onDone }: { onDone: () => void }) {
     finally { setBusy(false); }
   }
   return (
-    <main className="pt-safe pb-safe mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-6 px-6">
+    <main className="pt-safe pb-safe mx-auto flex h-dvh max-w-sm flex-col justify-center gap-6 overflow-y-auto px-6">
       <div>
         <span className="mb-4 flex size-11 items-center justify-center rounded-[14px] bg-accent text-accent-ink"><svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M3 12h4l3-8 4 16 3-8h4" /></svg></span>
         <h1 className="t-title">FitTrack</h1>
@@ -59,10 +59,11 @@ function QuickAddButton() {
 function Shell({ onLogout }: { onLogout: () => void }) {
   const { openQuick } = useApp();
   const { pathname } = useLocation();
-  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  const scroller = useRef<HTMLDivElement>(null);
+  useEffect(() => { scroller.current?.scrollTo(0, 0); }, [pathname]);
   const chat = pathname.startsWith('/ai');
   return (
-    <div className="min-h-dvh lg:pl-60">
+    <div ref={scroller} className="h-dvh overflow-y-auto overscroll-y-none lg:pl-60">
       <Sidebar onQuickAdd={openQuick} />
       <main className="mx-auto w-full max-w-xl px-4 pt-safe lg:max-w-5xl lg:px-10 lg:pb-12 lg:pt-8" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 7rem)' }}>
         {/* El chat usa position:fixed: su página solo puede animar opacidad (un transform lo descolocaría) */}
