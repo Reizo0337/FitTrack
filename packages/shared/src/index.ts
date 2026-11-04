@@ -6,3 +6,4 @@ export * from './health';
 export * from './stats';
 export * from './insights';
 export * from './goals';
+export * from './fasting';

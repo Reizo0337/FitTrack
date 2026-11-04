@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Download } from 'lucide-react';
 import { api, ApiError, download } from '../api';
+import { FastingSettings } from '../components/Fasting';
 import { PageHeader } from '../components/PageHeader';
 import { useData } from '../hooks';
 import type { Profile } from '../types';
@@ -37,6 +38,7 @@ export function Settings({ onLogout }: { onLogout: () => void }) {
         <Section id="ia" title="Asistente de IA" text="Elige el proveedor y el modelo de cada tarea. Las claves se guardan cifradas en el servidor.">
           <AISettings />
         </Section>
+        <Section id="ayuno" title="Ayuno" text="Define la hora de cada comida. El ayuno nocturno se activa solo después de la cena."><FastingSettings /></Section>
         <Section id="apple-health" title="Apple Health" text="Una web no puede leer HealthKit: un Atajo de iOS envía tus datos con un token personal."><Health /></Section>
         <Section id="notificaciones" title="Notificaciones"><Notifications /></Section>
         <Section id="apariencia" title="Apariencia">

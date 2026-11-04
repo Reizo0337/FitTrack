@@ -20,6 +20,7 @@ import { aiRoutes } from './modules/ai/routes';
 import { accountRoutes } from './modules/account/routes';
 import { goalRoutes } from './modules/goals/routes';
 import { pantryRoutes } from './modules/pantry/routes';
+import { fastingRoutes } from './modules/fasting/routes';
 import { photoRoutes } from './modules/photos/routes';
 import fastifyStatic from '@fastify/static';
 import { existsSync } from 'node:fs';
@@ -121,6 +122,7 @@ export async function buildApp(env: Env, prisma: PrismaClient, deps: { fetch?: t
   await app.register(photoRoutes, { prefix: '/api/photos' });
   await app.register(goalRoutes, { prefix: '/api/goals' });
   await app.register(pantryRoutes, { prefix: '/api/pantry' });
+  await app.register(fastingRoutes, { prefix: '/api/fasting' });
 
   // Web compilada servida desde el mismo origen (necesario para cookies fiables en iOS/Safari y sin CORS).
   const staticDir = env.STATIC_DIR ? resolve(env.STATIC_DIR) : null;

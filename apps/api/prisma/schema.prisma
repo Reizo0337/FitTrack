@@ -80,6 +80,18 @@ model User {
   menus        WeeklyMenu[]
   pantry       PantryItem[]
   healthSync   HealthSyncRecord[]
+  fasting      FastingConfig?
+}
+
+// Ayuno automático: horario de comidas del usuario (HH:mm, hora local). El ayuno va de la cena al desayuno.
+model FastingConfig {
+  userId        String  @id
+  enabled       Boolean @default(true)
+  breakfastTime String  @default("08:00")
+  lunchTime     String  @default("14:00")
+  snackTime     String  @default("17:30")
+  dinnerTime    String  @default("21:00")
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model RefreshToken {

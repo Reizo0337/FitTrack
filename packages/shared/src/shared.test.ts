@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { computeFasting, DEFAULT_FASTING, mealGaps, zonedToUtc } from './fasting';
 import { detectTrend, findViolations, weeklyWindows, parseNutritionText, pearson, rollingAverageByDate, assessPace, bmrMifflin, checkCalorieTarget, expectedWeeklyLossKg, movingAverage, scaleFromPer100, tdeeFromBmr, totalExpenditure, weeksToGoal } from './index';
 
 const prozis100 = { kcal: 384, protein: 42, carbs: 33, fat: 9, satFat: 2.4, fiber: 1.7, sugars: 2.5, salt: 1 };
@@ -99,5 +100,48 @@ describe('energía', () => {
   it('media móvil ignora huecos sin inventar datos', () => {
     expect(movingAverage([100, null, 98], 7)).toEqual([100, 100, 99]);
     expect(movingAverage([null, null], 7)).toEqual([null, null]);
+  });
+});
+
+describe('ayuno', () => {
+  const tz = 'Europe/Madrid';
+  const at = (d: string, t: string) => zonedToUtc(d, t, tz);
+  const run = (now: Date, entries: { type: string; at: Date; localDate: string }[] = [], cfg = DEFAULT_FASTING) => computeFasting({ now, tz, cfg, bmr: 1680, entries });
+
+  it('convierte hora local a UTC (invierno y verano)', () => {
+    expect(zonedToUtc('2026-01-15', '21:00', tz).toISOString()).toBe('2026-01-15T20:00:00.000Z');
+    expect(zonedToUtc('2026-07-15', '21:00', tz).toISOString()).toBe('2026-07-15T19:00:00.000Z');
+  });
+  it('tras la hora de cena empieza solo y calcula kcal en reposo', () => {
+    const s = run(at('2026-03-10', '23:00'));
+    expect(s.state).toBe('fasting');
+    expect(s.startSource).toBe('schedule');
+    expect(s.elapsedHours).toBe(2);
+    expect(s.kcalBurned).toBe(140); // 1680/24 = 70 kcal/h
+  });
+  it('usa la cena registrada como inicio y la primera comida como fin', () => {
+    const dinner = { type: 'DINNER', at: at('2026-03-10', '22:00'), localDate: '2026-03-10' };
+    const mid = run(at('2026-03-11', '06:00'), [dinner]);
+    expect(mid.state).toBe('fasting');
+    expect(mid.startSource).toBe('logged');
+    expect(mid.elapsedHours).toBe(8);
+    const done = run(at('2026-03-11', '09:00'), [dinner, { type: 'BREAKFAST', at: at('2026-03-11', '08:30'), localDate: '2026-03-11' }]);
+    expect(done.state).toBe('done');
+    expect(done.elapsedHours).toBe(10.5);
+    expect(done.kcalBurned).toBe(735);
+  });
+  it('antes de la cena y con el ayuno anterior roto queda en espera', () => {
+    const entries = [{ type: 'BREAKFAST', at: at('2026-03-11', '08:30'), localDate: '2026-03-11' }];
+    expect(run(at('2026-03-11', '15:00'), entries).state).toBe('done');
+    expect(run(at('2026-03-11', '15:00'), entries).nextStartAt).toBe(at('2026-03-11', '21:00').toISOString());
+  });
+  it('ignora registros añadidos a posteriori y respeta enabled=false', () => {
+    const late = { type: 'DINNER', at: at('2026-03-11', '09:00'), localDate: '2026-03-10' };
+    expect(run(at('2026-03-11', '10:00'), [late]).startSource).toBe('schedule');
+    expect(run(at('2026-03-11', '10:00'), [], { ...DEFAULT_FASTING, enabled: false }).state).toBe('off');
+  });
+  it('calcula las horas entre comidas', () => {
+    const g = mealGaps(DEFAULT_FASTING);
+    expect(g.map((x) => x.hours)).toEqual([6, 3.5, 3.5, 11]);
   });
 });
