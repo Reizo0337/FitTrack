@@ -50,36 +50,61 @@ export function FoodSearch({ onPick }: { onPick: (i: FoodData) => void }) {
   const [q, setQ] = useState('');
   const [items, setItems] = useState<FoodData[] | null>(null);
   const [off, setOff] = useState<FoodData[] | null>(null);
+  const [offState, setOffState] = useState<'idle' | 'loading' | 'error'>('idle');
   const [msg, setMsg] = useState('');
-  useEffect(() => {
-    setOff(null);
-    const t = setTimeout(() => { api<{ items: FoodData[] }>(`/foods/search?q=${encodeURIComponent(q)}`).then((r) => setItems(r.items)).catch(() => setMsg('No se pudo buscar.')); }, 250);
-    return () => clearTimeout(t);
-  }, [q]);
-  async function searchOff() {
-    setMsg('Buscando en Open Food Facts…');
-    try { setOff((await api<{ items: FoodData[] }>(`/foods/off/search?q=${encodeURIComponent(q)}`)).items); setMsg(''); }
-    catch { setMsg('Open Food Facts no está disponible ahora mismo.'); }
+  const seq = useRef(0); // descarta respuestas de búsquedas ya superadas por lo que sigues escribiendo
+  const query = q.trim();
+
+  async function searchOff(term: string, n: number) {
+    setOffState('loading');
+    try {
+      const r = await api<{ items: FoodData[] }>(`/foods/off/search?q=${encodeURIComponent(term)}`);
+      if (n === seq.current) { setOff(r.items); setOffState('idle'); }
+    } catch { if (n === seq.current) setOffState('error'); }
   }
+
+  useEffect(() => {
+    const n = ++seq.current;
+    setOff(null); setOffState('idle'); setMsg('');
+    const t = setTimeout(async () => {
+      try {
+        const r = await api<{ items: FoodData[] }>(`/foods/search?q=${encodeURIComponent(query)}`);
+        if (n !== seq.current) return;
+        setItems(r.items);
+        // Sin resultados propios: se busca sola en Open Food Facts (con tres letras o más).
+        if (query.length >= 3 && r.items.length === 0) searchOff(query, n);
+      } catch { if (n === seq.current) setMsg('No se pudo buscar.'); }
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
   return (
     <div>
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-[18px] -translate-y-1/2 text-ink-3" aria-hidden />
-        <input className="min-h-11 w-full rounded-ctl border border-line-strong bg-surface pl-10 pr-3 placeholder:text-ink-3 focus:border-accent focus:outline-none" placeholder="Buscar en tus alimentos" aria-label="Buscar alimento" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+        <input className="min-h-11 w-full rounded-ctl border border-line-strong bg-surface pl-10 pr-3 placeholder:text-ink-3 focus:border-accent focus:outline-none" placeholder="Buscar un alimento" aria-label="Buscar alimento" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
       </div>
-      <p className="t-meta mb-1 mt-3">{q ? 'Resultados' : 'Favoritos y recientes'}</p>
+      <p className="t-meta mb-1 mt-3">{query ? 'En tus alimentos' : 'Favoritos y recientes'}</p>
       {items === null ? <div className="flex flex-col gap-2"><Skeleton className="h-12" /><Skeleton className="h-12" /></div>
         : items.length ? <ul>{items.map((i) => <Row key={`${i.kind}${i.id}`} i={i} onPick={onPick} />)}</ul>
-          : <p className="t-meta py-3">{q ? 'Nada en tu base de datos.' : 'Aún no tienes favoritos ni alimentos recientes. Busca, escanea o crea uno.'}</p>}
-      {q.length >= 2 && (off ? (
-        <div className="mt-3"><p className="t-over mb-1">Open Food Facts</p>
-          {off.length ? <ul>{off.map((i, n) => <Row key={`off${n}`} i={i} onPick={onPick} />)}</ul> : <p className="t-meta py-2">Sin resultados con datos nutricionales completos.</p>}</div>
-      ) : <Button variant="secondary" block className="mt-3" onClick={searchOff}>Buscar «{q}» en Open Food Facts</Button>)}
+          : <p className="t-meta py-3">{query ? 'Nada en tu base de datos.' : 'Aún no tienes favoritos ni alimentos recientes. Busca, escanea o crea uno.'}</p>}
+
+      {query.length >= 2 && (
+        <div className="mt-3">
+          {offState === 'loading' && <div role="status" aria-label="Buscando en Open Food Facts"><p className="t-over mb-2">Open Food Facts</p><div className="flex flex-col gap-2"><Skeleton className="h-12" /><Skeleton className="h-12" /></div><p className="t-meta mt-2">Buscando «{query}» en Open Food Facts…</p></div>}
+          {offState === 'error' && <div className="flex flex-col gap-2"><Notice tone="info">Open Food Facts no está disponible ahora mismo. Puedes reintentarlo o crear el alimento a mano.</Notice><Button variant="secondary" block onClick={() => searchOff(query, seq.current)}>Reintentar</Button></div>}
+          {offState === 'idle' && off && (
+            <><p className="t-over mb-1">Open Food Facts</p>
+              {off.length ? <ul>{off.map((i, n) => <Row key={`off${n}`} i={i} onPick={onPick} />)}</ul> : <p className="t-meta py-2">Sin resultados con datos nutricionales completos. Prueba otro nombre o créalo a mano en la pestaña «Crear».</p>}</>
+          )}
+          {offState === 'idle' && !off && items !== null && items.length > 0 && <Button variant="secondary" block onClick={() => searchOff(query, seq.current)}>Buscar también «{query}» en Open Food Facts</Button>}
+        </div>
+      )}
       {msg && <p role="status" className="t-meta mt-2">{msg}</p>}
     </div>
   );
 }
-
 function Scan({ onPick, onMissing }: { onPick: (i: FoodData) => void; onMissing: (code: string, msg: string) => void }) {
   const video = useRef<HTMLVideoElement>(null);
   const [err, setErr] = useState('');

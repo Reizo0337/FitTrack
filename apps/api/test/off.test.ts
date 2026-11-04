@@ -8,7 +8,7 @@ const env = loadEnv({ ...process.env, NODE_ENV: 'test', DATABASE_URL: process.en
 const prisma = new PrismaClient({ datasources: { db: { url: env.DATABASE_URL } } });
 
 // Respuestas simuladas de Open Food Facts; `mode` decide cuál de los dos buscadores falla.
-let mode: 'ok' | 'modern-down' | 'all-down' | 'timeout' = 'ok';
+let mode: 'ok' | 'modern-down' | 'all-down' | 'timeout' | 'modern-empty-classic-down' = 'ok';
 const urls: string[] = [];
 const modernHit = { code: '7501020542134', product_name: 'Leche en polvo', brands: ['Nutri leche'], nutriments: { 'energy-kj_100g': 2048, proteins_100g: 15, carbohydrates_100g: 55.4, fat_100g: 23, 'saturated-fat_100g': 11, sugars_100g: 33.4, salt_100g: 0.97 } };
 const classicHit = { code: '111', product_name: 'Leche clásica', brands: 'MarcaA, MarcaB', nutriments: { 'energy-kcal_100g': 46, proteins_100g: 3.2, carbohydrates_100g: 4.8, fat_100g: 1.6 } };
@@ -19,8 +19,8 @@ const fake = (async (url: string, init?: RequestInit) => {
   urls.push(u);
   expect((init?.headers as Record<string, string>)['user-agent']).toMatch(/FitTrack/); // User-Agent identificable
   if (mode === 'timeout') throw Object.assign(new Error('timeout'), { name: 'TimeoutError' });
-  if (u.includes('search.openfoodfacts.org')) return mode === 'ok' ? json({ hits: [modernHit, { code: '2', product_name: 'Incompleto', nutriments: {} }] }) : json({}, 503);
-  if (u.includes('cgi/search.pl')) return mode === 'all-down' ? json({}, 503) : json({ products: [classicHit] });
+  if (u.includes('search.openfoodfacts.org')) return mode === 'ok' ? json({ hits: [modernHit, { code: '2', product_name: 'Incompleto', nutriments: {} }] }) : mode === 'modern-empty-classic-down' ? json({ hits: [] }) : json({}, 503);
+  if (u.includes('cgi/search.pl')) return mode === 'all-down' || mode === 'modern-empty-classic-down' ? json({}, 503) : json({ products: [classicHit] });
   return json({ status: 0 }, 404);
 }) as unknown as typeof fetch;
 
@@ -66,6 +66,12 @@ describe('búsqueda en Open Food Facts', () => {
     const r = await search('leche');
     expect(r.statusCode).toBe(502);
     expect(r.json().error).toBe('OFF_UNAVAILABLE');
+  });
+  it('si un buscador responde sin resultados y el otro falla, es «sin resultados», no «no disponible»', async () => {
+    mode = 'modern-empty-classic-down';
+    const r = await search('xqzwvk');
+    expect(r.statusCode).toBe(200);
+    expect(r.json().items).toEqual([]);
   });
   it('un tiempo de espera agotado también se trata como no disponible', async () => {
     mode = 'timeout';

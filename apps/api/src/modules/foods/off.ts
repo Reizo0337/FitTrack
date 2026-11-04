@@ -99,13 +99,14 @@ export async function offSearch(f: Fetch, q: string): Promise<FoodItem[]> {
     },
   ];
   let lastErr: unknown;
+  let answered = false; // algún buscador respondió bien (aunque sin resultados)
   for (const run of attempts) {
     try {
       const items = await run();
       if (items.length) return items;
-      lastErr = undefined; // respuesta válida pero sin resultados completos: prueba el siguiente
+      answered = true; // respuesta válida pero sin resultados completos: prueba el siguiente
     } catch (e) { lastErr = e; }
   }
-  if (lastErr) throw lastErr;
+  if (lastErr && !answered) throw lastErr; // solo es un fallo si ninguno llegó a responder
   return [];
 }
