@@ -6,15 +6,28 @@ export type CompleteArgs = { apiKey: string; model: string; system: string; mess
 export type Completion = { text: string; tokensIn: number; tokensOut: number };
 
 export class ProviderError extends Error {
-  constructor(public kind: 'auth' | 'rate' | 'billing' | 'model' | 'other', public status: number) {
+  /** `detail`: mensaje breve del proveedor (cuota agotada, modelo sobrecargado…); nunca incluye la clave. `retryAfterMs`: espera sugerida. */
+  constructor(public kind: 'auth' | 'rate' | 'overloaded' | 'billing' | 'model' | 'other', public status: number, public detail?: string, public retryAfterMs?: number) {
     super(`provider_${kind}_${status}`);
   }
 }
 
-/** Nunca se incluye la clave ni el cuerpo de la respuesta en el error. */
+/** Extrae solo el texto del mensaje de error del proveedor (recortado), no el cuerpo entero. */
+async function errorDetail(r: Response): Promise<string | undefined> {
+  try {
+    const j = (await r.json()) as { error?: { message?: string } | string };
+    const m = typeof j.error === 'string' ? j.error : j.error?.message;
+    return m?.replace(/\s+/g, ' ').slice(0, 220);
+  } catch { return undefined; }
+}
+
 async function post(f: typeof fetch, url: string, headers: Record<string, string>, body: unknown): Promise<unknown> {
   const r = await f(url, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body), signal: AbortSignal.timeout(90_000) });
-  if (!r.ok) throw new ProviderError(r.status === 401 || r.status === 403 ? 'auth' : r.status === 429 ? 'rate' : r.status === 402 ? 'billing' : r.status === 404 ? 'model' : 'other', r.status);
+  if (!r.ok) {
+    const kind = r.status === 401 || r.status === 403 ? 'auth' : r.status === 429 ? 'rate' : r.status === 503 || r.status === 529 ? 'overloaded' : r.status === 402 ? 'billing' : r.status === 404 ? 'model' : 'other';
+    const ra = Number(r.headers.get('retry-after'));
+    throw new ProviderError(kind, r.status, await errorDetail(r), Number.isFinite(ra) && ra > 0 ? ra * 1000 : undefined);
+  }
   return r.json();
 }
 

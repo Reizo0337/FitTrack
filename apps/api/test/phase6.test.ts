@@ -16,6 +16,7 @@ const anthropicReply = (o: unknown) => new Response(JSON.stringify({ content: [{
 const fake = (async (_u: string, init: RequestInit) => {
   sentBodies.push(String(init.body));
   const body = String(init.body);
+  if (body.includes('"model":"modelo-saturado"')) return new Response(JSON.stringify({ error: { message: 'quota exceeded' } }), { status: 429 });
   if (body.includes('Examina la imagen adjunta')) return anthropicReply(plateIsFood ? { isFood: true, dish: 'Puré de patata', questions: [{ id: 'q1', question: '¿Tamaño de la ración?', options: ['Pequeña', 'Normal'] }] } : { isFood: false, reason: 'es un gato', questions: [] });
   if (body.includes('Analiza el plato')) return anthropicReply({ isFood: true, items: [{ name: 'Puré de patata', grams: 250, kcal: 220, protein: 5, carbs: 35, fat: 7 }] });
   if (body.includes('"type":"image"')) return new Response(JSON.stringify({ content: [{ type: 'text', text: JSON.stringify({ items: [{ name: 'yogur natural', quantity: '4 uds' }, { name: 'tomates', quantity: null }], notes: null }) }], usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200 });
@@ -161,6 +162,15 @@ describe('despensa y lista de la compra', () => {
     expect(r.statusCode).toBe(200);
     expect(JSON.parse(sentBodies[0]!).messages[0].content).toContain('"alimentosDisponibles":["Arroz","Huevos"]');
   });
+});
+
+describe('modelo de reconocimiento saturado', () => {
+  it('si responde 429 usa el modelo del asistente en vez de fallar con 503', async () => {
+    await call('PUT', '/api/ai/config', { items: [{ task: 'FOOD_RECOGNITION', provider: 'ANTHROPIC', model: 'modelo-saturado' }] });
+    const r = await call('POST', '/api/ai/food/parse', { text: 'dos huevos revueltos', date: DAY });
+    expect(r.statusCode).not.toBe(503);
+    await call('PUT', '/api/ai/config', { items: [{ task: 'FOOD_RECOGNITION', provider: 'ANTHROPIC', model: 'claude-haiku-5-5' }] });
+  }, 20000);
 });
 
 describe('foto del plato', () => {

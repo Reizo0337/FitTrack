@@ -31,14 +31,39 @@ async function guard(d: AIDeps, task: AITask) {
   return { provider, model, apiKey: decryptSecret(k.encryptedKey, d.env.MASTER_KEY) };
 }
 
-async function call(d: AIDeps, task: AITask, g: Awaited<ReturnType<typeof guard>>, system: string, messages: ChatMsg[], json: boolean, maxTokens: number): Promise<Completion> {
+type Guard = Awaited<ReturnType<typeof guard>>;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const transient = (e: unknown): e is ProviderError => e instanceof ProviderError && (e.kind === 'rate' || e.kind === 'overloaded');
+
+/** Un intento con un proveedor; ante límite de peticiones o sobrecarga espera un poco y reintenta una vez. */
+async function tryProvider(d: AIDeps, g: Guard, system: string, messages: ChatMsg[], json: boolean, maxTokens: number): Promise<Completion> {
+  const run = () => ADAPTERS[g.provider]({ apiKey: g.apiKey, model: g.model, system, messages, json, maxTokens, fetchImpl: d.fetchImpl });
+  try { return await run(); }
+  catch (e) {
+    if (!transient(e)) throw e;
+    await sleep(Math.min(e.retryAfterMs ?? 2000, 6000));
+    return run();
+  }
+}
+
+async function call(d: AIDeps, task: AITask, g: Guard, system: string, messages: ChatMsg[], json: boolean, maxTokens: number): Promise<Completion> {
   let out: Completion;
   try {
-    out = await ADAPTERS[g.provider]({ apiKey: g.apiKey, model: g.model, system, messages, json, maxTokens, fetchImpl: d.fetchImpl });
+    try {
+      out = await tryProvider(d, g, system, messages, json, maxTokens);
+    } catch (e) {
+      // El modelo de reconocimiento (más ligero, con su propia cuota) está saturado: se usa el del asistente, que sí responde.
+      if (!transient(e) || task === 'NUTRITIONIST') throw e;
+      const alt = await guard(d, 'NUTRITIONIST').catch(() => null);
+      if (!alt || (alt.provider === g.provider && alt.model === g.model)) throw e;
+      out = await tryProvider(d, alt, system, messages, json, maxTokens);
+    }
   } catch (e) {
     if (e instanceof ProviderError) {
+      const why = e.detail ? ` Detalle del proveedor: ${e.detail}` : '';
       if (e.kind === 'auth') throw new AIError(502, 'AI_PROVIDER_AUTH', 'El proveedor rechazó la clave API. Revísala en Ajustes.');
-      if (e.kind === 'rate') throw new AIError(503, 'AI_PROVIDER_BUSY', 'El proveedor está limitando las peticiones. Inténtalo en un rato.');
+      if (e.kind === 'rate') throw new AIError(503, 'AI_PROVIDER_BUSY', `El proveedor está limitando las peticiones o tu cuota se ha agotado. Inténtalo en un rato o cambia el modelo en Ajustes.${why}`);
+      if (e.kind === 'overloaded') throw new AIError(503, 'AI_PROVIDER_BUSY', `El modelo del proveedor está sobrecargado ahora mismo. Inténtalo de nuevo en unos segundos.${why}`);
       if (e.kind === 'billing') throw new AIError(402, 'AI_PROVIDER_BILLING', 'Tu cuenta del proveedor no tiene crédito o la facturación no está activa. Añade saldo en su consola y vuelve a probar.');
       if (e.kind === 'model') throw new AIError(404, 'AI_MODEL_NOT_FOUND', `El modelo «${g.model}» no está disponible para tu cuenta (puede estar retirado). Cámbialo en Ajustes → Asistente de IA.`);
       throw new AIError(502, 'AI_PROVIDER_ERROR', `Error del proveedor (${e.status}).`);
